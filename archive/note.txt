@@ -1,0 +1,14 @@
+digital_companion/
+├─ chat.py
+├─ prompts/
+│  ├─ persona.txt
+│  ├─ user_profile.txt
+│  ├─ style_rules.txt
+│  └─ memory_summary.txt
+├─ data/
+├─ memory.json
+│  ├─ examples.json
+│  └─ chat_log.jsonl
+├─ .env
+├─ requirements.txt
+└─ README.md
