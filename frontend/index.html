@@ -310,9 +310,9 @@
     </div>
 
     <div class="main">
-        <div class="header" id="chatTitle">
+        <div class="header">
             <button id="menubutton">☰</button>
-            💬 Digital Companion
+            <span id="chatTitle">💬 Digital Companion</span>
         </div>
         <div class="chat-box" id="chatBox"></div>
 
@@ -348,6 +348,8 @@
     const newChatButton = document.getElementById("newChatButton");
     const chatList = document.getElementById("chatList");
     const chatTitle = document.getElementById("chatTitle");
+    chatTitle.textContent = data.title || "💬 Digital Companion";
+
     const dropZone = document.getElementById("dropZone");
     const imageInput = document.getElementById("imageInput");
     const imagePreview = document.getElementById("imagePreview");
