@@ -20,11 +20,10 @@ BASE_DIR = Path(__file__).parent
 PROMPTS_DIR = BASE_DIR / "prompts"
 DATA_DIR = BASE_DIR / "data"
 
-# 环境变量
-MODEL_NAME = os.getenv("MODEL_NAME", "gpt-5.4")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.gptsapi.net/v1")
-OPENAI_PROXY = os.getenv("OPENAI_PROXY", "http://127.0.0.1:7897")
+OPENAI_PROXY = os.getenv("OPENAI_PROXY")
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-5.4")
 
 if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY 未设置，请检查 .env 文件。")
