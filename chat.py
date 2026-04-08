@@ -22,23 +22,25 @@ DATA_DIR = BASE_DIR / "data"
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.gptsapi.net/v1")
-OPENAI_PROXY = os.getenv("OPENAI_PROXY")
+# OPENAI_PROXY = os.getenv("OPENAI_PROXY")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-5.4")
 
 if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY 未设置，请检查 .env 文件。")
 
 # HTTP client（代理 + 超时）
+"""
 http_client = httpx.Client(
     proxy=OPENAI_PROXY,
     timeout=httpx.Timeout(60.0, connect=20.0)
 )
+"""
 
 # OpenAI-compatible client
 client = OpenAI(
     api_key=OPENAI_API_KEY,
     base_url=OPENAI_BASE_URL,
-    http_client=http_client
+    # http_client=http_client
 )
 
 # ----------------------------
