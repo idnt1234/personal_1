@@ -10,7 +10,6 @@ from typing import Optional
 import httpx
 from dotenv import load_dotenv
 from openai import OpenAI, APITimeoutError, APIConnectionError, APIStatusError
-client = OpenAI()
 
 # 读取 .env
 load_dotenv()
@@ -89,92 +88,18 @@ MEMORY_PATH = DATA_DIR / "memory.json"
 EXAMPLES_PATH = DATA_DIR / "examples.json"
 CHAT_LOG_PATH = DATA_DIR / "chat_log.jsonl"
 
-def build_memory_summary(memory: dict) -> str:
-    parts = []
+from memory import (
+    default_memory,
+    load_json,
+    save_json,
+    build_memory_summary,
+    update_memory_from_extraction,
+)
 
-    long_term = memory.get("long_term", {})
-    if long_term:
-        prefs = long_term.get("preferences", [])
-        topics = long_term.get("topics", [])
-        rel = long_term.get("relationship_notes", [])
-
-        long_term_text = []
-
-        if prefs:
-            long_term_text.append(
-                "你记得用户在一些聊天中表达过这些偏好："
-                + "；".join(prefs)
-            )
-
-        if topics:
-            long_term_text.append(
-                "你们之间经常会聊到的一些话题包括："
-                + "、".join(topics)
-            )
-
-        if rel:
-            long_term_text.append(
-                "关于你们之间的相处方式，你隐约记得："
-                + "；".join(rel)
-            )
-
-        if long_term_text:
-            parts.append("\n".join(long_term_text))
-
-    short_term = memory.get("short_term", [])[-5:]
-    if short_term:
-        items = [
-            f"{x['date']}左右，她提到过：{x['summary']}"
-            for x in short_term
-        ]
-        parts.append(
-            "最近的几次聊天让你还隐约记得这些事情：\n- "
-            + "\n- ".join(items)
-        )
-
-    inside_jokes = memory.get("inside_jokes", [])[-5:]
-    if inside_jokes:
-        parts.append(
-            "你们之间偶尔会出现的一些内部梗："
-            + "；".join(inside_jokes)
-        )
-
-    important_events = memory.get("important_events", [])[-5:]
-    if important_events:
-        events = [f"- {x}" for x in important_events]
-        parts.append(
-            "你记得对用户来说比较重要的一些事情：\n"
-            + "\n".join(events)
-        )
-
-    return "\n\n".join(parts).strip()
-
-def update_memory_rule_based(memory: dict, user_msg: str, assistant_msg: str):
-    """
-    先用最简单的规则版，后续你可以改成“让模型输出结构化记忆更新”。
-    """
-    summary = user_msg[:80]
-    memory.setdefault("short_term", []).append({
-        "date": datetime.now().strftime("%Y-%m-%d"),
-        "summary": f"用户提到：{summary}"
-    })
-
-    memory["short_term"] = memory["short_term"][-20:]
-
-    if "不喜欢" in user_msg or "讨厌" in user_msg:
-        memory.setdefault("long_term", {}).setdefault("preferences", [])
-        memory["long_term"]["preferences"].append(
-            f"用户在近期表达过偏好/厌恶：{user_msg[:60]}"
-        )
-
-    if "long_term" in memory and "preferences" in memory["long_term"]:
-        dedup = []
-        seen = set()
-        for item in memory["long_term"]["preferences"]:
-            if item not in seen:
-                seen.add(item)
-                dedup.append(item)
-        memory["long_term"]["preferences"] = dedup[-20:]
+from summary import (
+    extract_memory_from_turn,
+    generate_image_summary,
+)
 
 # ----------------------------
 # Style routing
@@ -212,57 +137,6 @@ def mode_instruction(mode: str) -> str:
         ),
     }
     return mapping.get(mode, mapping["casual"])
-
-def build_image_summary_instruction() -> str:
-    return """
-你现在不是在和用户聊天，而是在为系统生成一条“图片记忆摘要”。
-
-要求：
-1. 用中文输出。
-2. 只输出摘要本身，不要加解释、前言、标题、引号。
-3. 长度尽量控制在 30~80 字。
-4. 抓住：场景、主要对象、明显特征、整体氛围。
-5. 不要编造看不见的细节。
-6. 如果图片信息不足，就如实概括可见内容。
-
-示例风格：
-- 蓝天下的冬季树枝场景，画面中可见两只黑白色鸟停在枝头，整体冷色调而安静。
-- 一张室内桌面照片，能看到电脑、书本和杯子，整体像学习或办公环境。
-""".strip()
-
-def generate_image_summary(user_msg: str, image_path: Optional[str] = None) -> str:
-    if not image_path:
-        return ""
-
-    data_url = image_path_to_data_url(image_path)
-    if not data_url:
-        return ""
-
-    instructions = build_image_summary_instruction()
-
-    input_items = [{
-        "role": "user",
-        "content": [
-            {
-                "type": "input_text",
-                "text": f"用户发送这张图片时附带的话是：{user_msg}"
-            },
-            {
-                "type": "input_image",
-                "image_url": data_url,
-                "detail": "auto"
-            }
-        ]
-    }]
-
-    response = client.responses.create(
-        model=MODEL_NAME,
-        instructions=instructions,
-        input=input_items
-    )
-
-    summary = response.output_text.strip()
-    return summary
 
 # ----------------------------
 # Prompt builder
@@ -361,24 +235,43 @@ def build_input_items(chat_history: list, user_msg: str, examples: list, image_p
 
     return items
 
-def generate_reply(user_msg: str, chat_history: list, image_path: Optional[str] = None):
-    memory = load_json(MEMORY_PATH, {
-        "long_term": {
-            "preferences": [],
-            "topics": [],
-            "relationship_notes": []
-        },
-        "short_term": [],
-        "inside_jokes": [],
-        "important_events": []
-    })
-
+def prepare_reply_context(user_msg: str, chat_history: list, image_path: Optional[str] = None):
+    memory = load_json(MEMORY_PATH, default_memory())
     examples = load_json(EXAMPLES_PATH, [])
 
     mode = detect_mode(user_msg)
     memory_summary = build_memory_summary(memory)
     instructions = build_instructions(memory_summary, mode)
     input_items = build_input_items(chat_history, user_msg, examples, image_path=image_path)
+
+    return memory, mode, instructions, input_items
+
+
+def finalize_reply_turn(
+    memory: dict,
+    user_msg: str,
+    assistant_msg: str,
+    mode: str,
+    image_path: Optional[str] = None
+):
+    append_jsonl(CHAT_LOG_PATH, {
+        "time": datetime.now().isoformat(),
+        "mode": mode,
+        "user": user_msg,
+        "assistant": assistant_msg,
+        "image_path": image_path
+    })
+
+    extracted = extract_memory_from_turn(client, MODEL_NAME, PROMPTS_DIR, user_msg, assistant_msg)
+    update_memory_from_extraction(memory, extracted)
+    save_json(MEMORY_PATH, memory)
+    
+def generate_reply(user_msg: str, chat_history: list, image_path: Optional[str] = None):
+    memory, mode, instructions, input_items = prepare_reply_context(
+        user_msg=user_msg,
+        chat_history=chat_history,
+        image_path=image_path
+    )
 
     response = client.responses.create(
         model=MODEL_NAME,
@@ -387,37 +280,22 @@ def generate_reply(user_msg: str, chat_history: list, image_path: Optional[str] 
     )
 
     assistant_msg = response.output_text.strip()
-
-    append_jsonl(CHAT_LOG_PATH, {
-        "time": datetime.now().isoformat(),
-        "mode": mode,
-        "user": user_msg,
-        "assistant": assistant_msg
-    })
-
-    update_memory_rule_based(memory, user_msg, assistant_msg)
-    save_json(MEMORY_PATH, memory)
-
+    finalize_reply_turn(
+        memory=memory,
+        user_msg=user_msg,
+        assistant_msg=assistant_msg,
+        mode=mode,
+        image_path=image_path
+    )
     return assistant_msg
 
+
 def stream_reply(user_msg: str, chat_history: list, image_path: Optional[str] = None):
-    memory = load_json(MEMORY_PATH, {
-        "long_term": {
-            "preferences": [],
-            "topics": [],
-            "relationship_notes": []
-        },
-        "short_term": [],
-        "inside_jokes": [],
-        "important_events": []
-    })
-
-    examples = load_json(EXAMPLES_PATH, [])
-
-    mode = detect_mode(user_msg)
-    memory_summary = build_memory_summary(memory)
-    instructions = build_instructions(memory_summary, mode)
-    input_items = build_input_items(chat_history, user_msg, examples, image_path=image_path)
+    memory, mode, instructions, input_items = prepare_reply_context(
+        user_msg=user_msg,
+        chat_history=chat_history,
+        image_path=image_path
+    )
 
     assistant_msg = ""
 
@@ -432,17 +310,47 @@ def stream_reply(user_msg: str, chat_history: list, image_path: Optional[str] = 
                 assistant_msg += delta
                 yield delta
 
-    append_jsonl(CHAT_LOG_PATH, {
-        "time": datetime.now().isoformat(),
-        "mode": mode,
-        "user": user_msg,
-        "assistant": assistant_msg,
-        "image_path": image_path
-    })
+    finalize_reply_turn(
+        memory=memory,
+        user_msg=user_msg,
+        assistant_msg=assistant_msg,
+        mode=mode,
+        image_path=image_path
+    )
 
-    update_memory_rule_based(memory, user_msg, assistant_msg)
-    save_json(MEMORY_PATH, memory)
+def extract_memory_from_turn(user_msg: str, assistant_msg: str) -> dict:
+    summary_prompt = read_text(PROMPTS_DIR / "summary_prompt.txt")
 
+    input_text = f"""
+User message:
+{user_msg}
+
+Assistant message:
+{assistant_msg}
+""".strip()
+
+    response = client.responses.create(
+        model=MODEL_NAME,
+        instructions=summary_prompt,
+        input=input_text
+    )
+
+    raw = response.output_text.strip()
+
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return {
+            "should_store": False,
+            "short_term_summary": "",
+            "preferences": [],
+            "topics": [],
+            "relationship_notes": [],
+            "inside_jokes": [],
+            "important_events": [],
+            "emotion_tone": "",
+            "confidence": 0.0
+        }
 
 # ----------------------------
 # Main chat loop
