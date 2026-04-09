@@ -346,22 +346,13 @@ def build_input_items(chat_history: list, user_msg: str, examples: list, image_p
     ]
 
     if image_path:
-        if image_path.startswith("http"):
-            # 直接用URL（推荐）
+        data_url = image_path_to_data_url(image_path)
+        if data_url:
             current_user_content.append({
                 "type": "input_image",
-                "image_url": image_path,
+                "image_url": data_url,
                 "detail": "auto"
             })
-        else:
-            # 本地路径才转 base64
-            data_url = image_path_to_data_url(image_path)
-            if data_url:
-                current_user_content.append({
-                    "type": "input_image",
-                    "image_url": data_url,
-                    "detail": "auto"
-                })
 
     items.append({
         "role": "user",
@@ -490,4 +481,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
