@@ -47,14 +47,14 @@
             padding: 12px;
             border: none;
             border-radius: 12px;
-            background: #2563eb;
+            background: #1f2937;
             color: white;
             font-size: 15px;
             cursor: pointer;
         }
 
         #newChatButton:hover {
-            background: #1d4ed8;
+            background: #111827;
         }
 
         .chat-list {
@@ -88,6 +88,9 @@
             font-size: 14px;
             font-weight: bold;
             margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .chat-item-time {
@@ -109,6 +112,10 @@
             border-bottom: 1px solid #e5e7eb;
             font-size: 22px;
             font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            overflow: hidden;
         }
 
         .chat-box {
@@ -207,14 +214,14 @@
             font-size: 16px;
             border: none;
             border-radius: 12px;
-            background: #2563eb;
+            background: #1f2937;
             color: white;
             cursor: pointer;
             min-width: 90px;
         }
 
         #sendButton:hover {
-            background: #1d4ed8;
+            background: #111827;
         }
 
         #sendButton:disabled,
