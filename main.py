@@ -266,8 +266,8 @@ async def upload_image(request: Request, file: UploadFile = File(...)):
     content = await file.read()
     save_path.write_bytes(content)
 
-    base_url = str(request.base_url).rstrip("/")
+    url = str(request.base_url).rstrip("/")
     return {
-        "image_path": f"https://valeria-cordilleran-dale.ngrok-free.dev/uploads/{filename}",
-        "preview_url": f"https://valeria-cordilleran-dale.ngrok-free.dev/uploads/{filename}"
+        "image_path": str(save_path),
+        "preview_url": f"https://valeria-xxx.ngrok-free.dev/uploads/{filename}"
     }
