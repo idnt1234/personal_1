@@ -606,7 +606,7 @@
         }
 
         const data = await res.json();
-        uploadedImagePath = data.preview_url;
+        uploadedImagePath = data.image_path;
 
         imagePreview.style.display = "block";
         imagePreview.innerHTML = `
