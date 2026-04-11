@@ -207,6 +207,7 @@ def new_chat(req: NewChatRequest, db: Session = Depends(get_db)):
 
 @app.post("/chat/stream")
 def chat_stream_api(req: ChatRequest):
+    print("🚀 enter chat_stream")
     user_msg = req.message.strip()
     if not user_msg:
         raise HTTPException(status_code=400, detail="message cannot be empty")
@@ -243,6 +244,7 @@ def chat_stream_api(req: ChatRequest):
             })
 
     def event_generator():
+        print("🚀 start event_generator")
         full_reply = ""
         try:
             # 先把用户消息存进去
