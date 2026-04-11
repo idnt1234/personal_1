@@ -303,11 +303,15 @@ async def upload_image(request: Request, file: UploadFile = File(...)):
 @app.get("/chats")
 def chats(session_id: str, db: Session = Depends(get_db)):
     data = crud.get_chats_by_session(db, session_id)
-    return [
-        {
-            "chat_id": c.chat_id,
-            "title": c.title,
-            "created_at": c.created_at.isoformat() if c.created_at else None,
-        }
-        for c in data
-    ]
+
+    return {
+        "chats": [
+            {
+                "chat_id": c.chat_id,
+                "title": c.title,
+                "created_at": c.created_at.isoformat() if c.created_at else None,
+                "updated_at": c.updated_at.isoformat() if c.updated_at else None,
+            }
+            for c in data
+        ]
+    }
