@@ -91,7 +91,7 @@ def generate_chat_id_from_db(db: Session, session_id: str) -> str:
     return f"chat_{next_number:03d}"
 
 
-def build_chat_history_from_messages(messages: List[Message]) -> List[Dict[str, str]]:
+def build_from_messages(messages: List[Message]) -> List[Dict[str, str]]:
     """
     把数据库里的 Message 列表，转成你 generate_reply / stream_reply
     需要的 chat_history 格式：
@@ -231,10 +231,17 @@ def chat_stream_api(req: ChatRequest):
         .all()
     )
 
-    chat_history = [
-        {"role": m.role, "text": m.content}
-        for m in old_messages
-    ]
+    chat_history = []
+
+    for i in range(0, len(old_messages) - 1, 2):
+        user_msg = old_messages[i]
+        assistant_msg = old_messages[i + 1]
+
+        if user_msg.role == "user" and assistant_msg.role == "assistant":
+            chat_history.append({
+                "user": user_msg.content,
+                "assistant": assistant_msg.content
+            })
 
     def event_generator():
         full_reply = ""
