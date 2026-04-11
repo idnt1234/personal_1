@@ -244,10 +244,10 @@ def chat_stream_api(req: ChatRequest):
             })
 
     def event_generator():
-        print("🚀 start event_generator")
         full_reply = ""
         try:
-            # 先把用户消息存进去
+            print("🟢 before save user")
+
             db.add(Message(
                 chat_id=req.chat_id,
                 role="user",
@@ -256,16 +256,18 @@ def chat_stream_api(req: ChatRequest):
             ))
             db.commit()
 
-            # 流式生成回复
+            print("🟢 before stream_reply")
+
             for chunk in stream_reply(
-                user_msg=req.message,
-                chat_history=chat_history,
-                image_path=req.image_path
+                    user_msg=req.message,
+                    chat_history=chat_history,
+                    image_path=req.image_path
             ):
                 full_reply += chunk
                 yield chunk
 
-            # 把助手回复存进去
+            print("🟢 after stream_reply")
+
             db.add(Message(
                 chat_id=req.chat_id,
                 role="assistant",
@@ -273,20 +275,22 @@ def chat_stream_api(req: ChatRequest):
                 created_at=datetime.utcnow()
             ))
 
-            # 第一次发消息时，顺手设置标题
             if len(old_messages) == 0:
                 chat_obj.title = req.message[:20] or "新对话"
 
             chat_obj.updated_at = datetime.utcnow()
             db.commit()
 
+            print("🟢 commit done")
+
         except Exception as e:
+            import traceback
+            traceback.print_exc()  # 🔥 关键
             db.rollback()
             yield f"\n[ERROR] {type(e).__name__}: {e}"
+
         finally:
             db.close()
-
-    return StreamingResponse(event_generator(), media_type="text/plain; charset=utf-8")
 
 
 @app.post("/upload-image")
