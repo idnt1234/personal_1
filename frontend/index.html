@@ -434,7 +434,7 @@
 
     async function loadChatList() {
         const response = await fetch(
-            `${API_BASE}/chats?session_id=${encodeURIComponent(SESSION_ID)}`,
+            `/chats?session_id=${encodeURIComponent(SESSION_ID)}`,
             {
                 headers: {
                     "ngrok-skip-browser-warning": "1"
@@ -453,7 +453,7 @@
 
     async function openChat(chatId) {
         const response = await fetch(
-            `${API_BASE}/history?session_id=${encodeURIComponent(SESSION_ID)}&chat_id=${encodeURIComponent(chatId)}`,
+            `/history?session_id=${encodeURIComponent(SESSION_ID)}&chat_id=${encodeURIComponent(chatId)}`,
             {
                 headers: {
                     "ngrok-skip-browser-warning": "1"
@@ -468,7 +468,10 @@
         const data = await response.json();
 
         currentChatId = chatId;
-        messages = data.messages || [];
+        messages = data.map(m => ({
+            role: m.role,
+            text: m.content
+        }));
         chatTitle.textContent = data.title || "💬 Digital Companion";
 
         renderMessages();
@@ -476,7 +479,7 @@
     }
 
     async function createNewChat() {
-        const response = await fetch(`${API_BASE}/new-chat`, {
+        const response = await fetch(`/new-chat`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -515,11 +518,10 @@
         scrollToBottom();
 
         try {
-            const response = await fetch(`${API_BASE}/chat/stream`, {
+            const response = await fetch(`/chat/stream`, {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/json",
-                    "ngrok-skip-browser-warning": "1"
+                    "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
                     message: message,
@@ -593,7 +595,7 @@
         const formData = new FormData();
         formData.append("file", file);
 
-        const res = await fetch(`${API_BASE}/upload-image`, {
+        const res = await fetch(`/upload-image`, {
             method: "POST",
             headers: {
                 "ngrok-skip-browser-warning": "1"
