@@ -244,10 +244,13 @@ def chat_stream_api(req: ChatRequest):
             })
 
     def event_generator():
+        print("🚀 start event_generator")
         full_reply = ""
-        try:
-            print("🟢 before save user")
 
+        try:
+            yield " "
+
+            # 先把用户消息存进去
             db.add(Message(
                 chat_id=req.chat_id,
                 role="user",
@@ -256,8 +259,7 @@ def chat_stream_api(req: ChatRequest):
             ))
             db.commit()
 
-            print("🟢 before stream_reply")
-
+            # 流式生成回复
             for chunk in stream_reply(
                     user_msg=req.message,
                     chat_history=chat_history,
@@ -266,8 +268,7 @@ def chat_stream_api(req: ChatRequest):
                 full_reply += chunk
                 yield chunk
 
-            print("🟢 after stream_reply")
-
+            # 把助手回复存进去
             db.add(Message(
                 chat_id=req.chat_id,
                 role="assistant",
@@ -281,11 +282,9 @@ def chat_stream_api(req: ChatRequest):
             chat_obj.updated_at = datetime.utcnow()
             db.commit()
 
-            print("🟢 commit done")
-
         except Exception as e:
             import traceback
-            traceback.print_exc()  # 🔥 关键
+            traceback.print_exc()
             db.rollback()
             yield f"\n[ERROR] {type(e).__name__}: {e}"
 
