@@ -21,7 +21,6 @@ import crud
 
 from database import SessionLocal
 from models import Chat, Message
-from datetime import datetime
 
 
 Base.metadata.create_all(bind=engine)
@@ -234,13 +233,13 @@ def chat_stream_api(req: ChatRequest):
     chat_history = []
 
     for i in range(0, len(old_messages) - 1, 2):
-        user_msg = old_messages[i]
-        assistant_msg = old_messages[i + 1]
+        user_message_obj = old_messages[i]
+        assistant_message_obj = old_messages[i + 1]
 
-        if user_msg.role == "user" and assistant_msg.role == "assistant":
+        if user_message_obj.role == "user" and assistant_message_obj.role == "assistant":
             chat_history.append({
-                "user": user_msg.content,
-                "assistant": assistant_msg.content
+                "user": user_message_obj.content,
+                "assistant": assistant_message_obj.content
             })
 
     def event_generator():
@@ -250,14 +249,14 @@ def chat_stream_api(req: ChatRequest):
             db.add(Message(
                 chat_id=req.chat_id,
                 role="user",
-                content=user_msg,
+                content=req.message,
                 created_at=datetime.utcnow()
             ))
             db.commit()
 
             # 流式生成回复
             for chunk in stream_reply(
-                user_msg=user_msg,
+                user_msg=req.message,
                 chat_history=chat_history,
                 image_path=req.image_path
             ):
@@ -274,7 +273,7 @@ def chat_stream_api(req: ChatRequest):
 
             # 第一次发消息时，顺手设置标题
             if len(old_messages) == 0:
-                chat_obj.title = user_msg[:20] or "新对话"
+                chat_obj.title = req.message[:20] or "新对话"
 
             chat_obj.updated_at = datetime.utcnow()
             db.commit()
