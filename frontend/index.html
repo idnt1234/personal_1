@@ -434,7 +434,7 @@
 
     async function loadChatList() {
         const response = await fetch(
-            `/chats?session_id=${encodeURIComponent(SESSION_ID)}`,
+            `${API_BASE}/chats?session_id=${encodeURIComponent(SESSION_ID)}`,
             {
                 headers: {
                     "ngrok-skip-browser-warning": "1"
@@ -453,7 +453,7 @@
 
     async function openChat(chatId) {
         const response = await fetch(
-            `/history?session_id=${encodeURIComponent(SESSION_ID)}&chat_id=${encodeURIComponent(chatId)}`,
+            `${API_BASE}/history?session_id=${encodeURIComponent(SESSION_ID)}&chat_id=${encodeURIComponent(chatId)}`,
             {
                 headers: {
                     "ngrok-skip-browser-warning": "1"
@@ -479,7 +479,7 @@
     }
 
     async function createNewChat() {
-        const response = await fetch(`/new-chat`, {
+        const response = await fetch(`${API_BASE}/new-chat`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -518,7 +518,7 @@
         scrollToBottom();
 
         try {
-            const response = await fetch(`/chat/stream`, {
+            const response = await fetch(`${API_BASE}/chat/stream`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -595,7 +595,7 @@
         const formData = new FormData();
         formData.append("file", file);
 
-        const res = await fetch(`/upload-image`, {
+        const res = await fetch(`${API_BASE}/upload-image`, {
             method: "POST",
             headers: {
                 "ngrok-skip-browser-warning": "1"
