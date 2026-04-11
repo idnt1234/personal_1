@@ -579,7 +579,7 @@
             scrollToBottom();
 
             await loadChatList();
-            await openChat(currentChatId);
+            // await openChat(currentChatId);
         } catch (error) {
             console.error("请求失败:", error);
             assistantMsgDiv.textContent = `请求失败：${error.message}`;
