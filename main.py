@@ -205,18 +205,87 @@ def new_chat(req: NewChatRequest, db: Session = Depends(get_db)):
     }
 
 
-@app.post("/chat/stream")
-def chat_stream_api(req: ChatRequest):
+@app.post("/chat")
+def chat_api(req: ChatRequest):
+    user_msg = req.message.strip()
+    if not user_msg:
+        raise HTTPException(status_code=400, detail="message cannot be empty")
 
-    reply = generate_reply(
-        user_msg=req.message,
-        chat_history=[],
-        image_path=req.image_path
-    )
+    db: Session = SessionLocal()
 
-    return {
-        "reply": reply
-    }
+    try:
+        # 找 chat
+        chat_obj = (
+            db.query(Chat)
+            .filter(Chat.session_id == req.session_id, Chat.chat_id == req.chat_id)
+            .first()
+        )
+        if not chat_obj:
+            raise HTTPException(status_code=404, detail="chat not found")
+
+        # 读历史
+        old_messages = (
+            db.query(Message)
+            .filter(Message.chat_id == req.chat_id)
+            .order_by(Message.created_at.asc())
+            .all()
+        )
+
+        chat_history = []
+        i = 0
+        while i < len(old_messages) - 1:
+            u = old_messages[i]
+            a = old_messages[i + 1]
+            if u.role == "user" and a.role == "assistant":
+                chat_history.append({
+                    "user": u.content,
+                    "assistant": a.content
+                })
+                i += 2
+            else:
+                i += 1
+
+        # 👉 生成完整回复（一次性）
+        reply = generate_reply(
+            user_msg=user_msg,
+            chat_history=chat_history,
+            image_path=req.image_path
+        )
+
+        # 👉 存 user
+        db.add(Message(
+            chat_id=req.chat_id,
+            role="user",
+            content=user_msg,
+            created_at=datetime.utcnow()
+        ))
+
+        # 👉 存 assistant
+        db.add(Message(
+            chat_id=req.chat_id,
+            role="assistant",
+            content=reply,
+            created_at=datetime.utcnow()
+        ))
+
+        # 👉 更新 chat
+        if len(old_messages) == 0:
+            chat_obj.title = user_msg[:20] or "新对话"
+
+        chat_obj.updated_at = datetime.utcnow()
+
+        db.commit()
+
+        return {
+            "reply": reply
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+    finally:
+        db.close()
 
 
 @app.post("/upload-image")
