@@ -12,6 +12,20 @@ from pydantic import BaseModel
 
 from chat import generate_reply, stream_reply
 
+from fastapi import Depends
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+from database import get_db, Base, engine
+import models
+import crud
+
+from database import SessionLocal
+from models import Chat, Message
+from datetime import datetime
+
+
+Base.metadata.create_all(bind=engine)
+
 
 app = FastAPI(title="Digital Companion API")
 
@@ -37,8 +51,8 @@ app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 # ----------------------------
 # Helpers
 # ----------------------------
-def now_iso() -> str:
-    return datetime.now().isoformat()
+def now_utc_iso() -> str:
+    return datetime.utcnow().isoformat()
 
 
 def load_chats() -> dict:
@@ -59,37 +73,61 @@ def ensure_session(chats: dict, session_id: str):
         chats[session_id] = {}
 
 
-def generate_chat_id(session_chats: dict) -> str:
-    existing_ids = session_chats.keys()
+def generate_chat_id_from_db(db: Session, session_id: str) -> str:
+    existing_ids = (
+        db.query(Chat.chat_id)
+        .filter(Chat.session_id == session_id)
+        .all()
+    )
+
     numbers = []
-    for chat_id in existing_ids:
+    for (chat_id,) in existing_ids:
         if chat_id.startswith("chat_"):
             suffix = chat_id.replace("chat_", "")
             if suffix.isdigit():
                 numbers.append(int(suffix))
+
     next_number = max(numbers, default=0) + 1
     return f"chat_{next_number:03d}"
 
 
-def build_chat_history(messages: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+def build_chat_history_from_messages(messages: List[Message]) -> List[Dict[str, str]]:
+    """
+    把数据库里的 Message 列表，转成你 generate_reply / stream_reply
+    需要的 chat_history 格式：
+    [
+        {"user": "...", "assistant": "..."},
+        ...
+    ]
+    """
     chat_history = []
-    for i in range(0, len(messages) - 1, 2):
+    i = 0
+
+    while i < len(messages) - 1:
         user_item = messages[i]
         assistant_item = messages[i + 1]
-        if user_item["role"] == "user" and assistant_item["role"] == "assistant":
+
+        if user_item.role == "user" and assistant_item.role == "assistant":
             chat_history.append({
-                "user": user_item["text"],
-                "assistant": assistant_item["text"]
+                "user": user_item.content,
+                "assistant": assistant_item.content
             })
+            i += 2
+        else:
+            i += 1
+
     return chat_history
 
 
-def get_chat_or_404(chats: dict, session_id: str, chat_id: str) -> dict:
-    ensure_session(chats, session_id)
-    session_chats = chats[session_id]
-    if chat_id not in session_chats:
+def get_chat_or_404_db(db: Session, session_id: str, chat_id: str) -> Chat:
+    chat = (
+        db.query(Chat)
+        .filter(Chat.session_id == session_id, Chat.chat_id == chat_id)
+        .first()
+    )
+    if not chat:
         raise HTTPException(status_code=404, detail="chat not found")
-    return session_chats[chat_id]
+    return chat
 
 
 # ----------------------------
@@ -115,104 +153,57 @@ def root():
     return {"message": "Digital Companion API is running."}
 
 
-@app.get("/chats")
-def get_chats(session_id: str = Query(...)):
-    chats = load_chats()
-    ensure_session(chats, session_id)
-
-    session_chats = chats[session_id]
-    result = []
-    for chat_id, chat_obj in session_chats.items():
-        result.append({
-            "chat_id": chat_id,
-            "title": chat_obj.get("title", "新对话"),
-            "created_at": chat_obj.get("created_at"),
-            "updated_at": chat_obj.get("updated_at"),
-        })
-
-    result.sort(key=lambda x: x.get("updated_at") or "", reverse=True)
-    return {"chats": result}
-
-
 @app.get("/history")
-def get_history(session_id: str = Query(...), chat_id: str = Query(...)):
-    chats = load_chats()
-    chat_obj = get_chat_or_404(chats, session_id, chat_id)
-    return {
-        "chat_id": chat_id,
-        "title": chat_obj.get("title", "新对话"),
-        "messages": chat_obj.get("messages", [])
-    }
+def history(session_id: str, chat_id: str, db: Session = Depends(get_db)):
+    chat = (
+        db.query(Chat)
+        .filter(Chat.session_id == session_id, Chat.chat_id == chat_id)
+        .first()
+    )
+    if not chat:
+        raise HTTPException(status_code=404, detail="chat not found")
+
+    messages = (
+        db.query(Message)
+        .filter(Message.chat_id == chat_id)
+        .order_by(Message.created_at.asc())
+        .all()
+    )
+
+    return [
+        {
+            "role": m.role,
+            "content": m.content,
+            "created_at": m.created_at.isoformat() if m.created_at else None,
+        }
+        for m in messages
+    ]
 
 
 @app.post("/new-chat")
-def new_chat(req: NewChatRequest):
-    chats = load_chats()
-    ensure_session(chats, req.session_id)
-
-    session_chats = chats[req.session_id]
-    chat_id = generate_chat_id(session_chats)
-
+def new_chat(req: NewChatRequest, db: Session = Depends(get_db)):
     title = (req.title or "新对话").strip() or "新对话"
-    timestamp = now_iso()
+    timestamp = datetime.utcnow()
 
-    session_chats[chat_id] = {
-        "title": title,
-        "created_at": timestamp,
-        "updated_at": timestamp,
-        "messages": []
-    }
+    chat_id = generate_chat_id_from_db(db, req.session_id)
 
-    save_chats(chats)
+    chat = Chat(
+        session_id=req.session_id,
+        chat_id=chat_id,
+        title=title,
+        created_at=timestamp,
+        updated_at=timestamp,
+    )
+    db.add(chat)
+    db.commit()
+    db.refresh(chat)
 
     return {
-        "chat_id": chat_id,
-        "title": title,
-        "created_at": timestamp,
-        "updated_at": timestamp
+        "chat_id": chat.chat_id,
+        "title": chat.title,
+        "created_at": chat.created_at.isoformat() if chat.created_at else None,
+        "updated_at": chat.updated_at.isoformat() if chat.updated_at else None,
     }
-
-
-@app.post("/chat")
-def chat_api(req: ChatRequest):
-    user_msg = req.message.strip()
-    if not user_msg:
-        raise HTTPException(status_code=400, detail="message cannot be empty")
-
-    try:
-        chats = load_chats()
-        chat_obj = get_chat_or_404(chats, req.session_id, req.chat_id)
-
-        messages = chat_obj.get("messages", [])
-        chat_history = build_chat_history(messages)
-
-        reply = generate_reply(
-            user_msg=user_msg,
-            chat_history=chat_history,
-            image_path=req.image_path
-        )
-
-        messages.append({"role": "user", "text": user_msg})
-        messages.append({"role": "assistant", "text": reply})
-
-        if not messages[:-2]:
-            chat_obj["title"] = user_msg[:20] or "新对话"
-
-        chat_obj["messages"] = messages
-        chat_obj["updated_at"] = now_iso()
-
-        save_chats(chats)
-
-        return {
-            "reply": reply,
-            "chat_id": req.chat_id,
-            "title": chat_obj["title"]
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}")
 
 
 @app.post("/chat/stream")
@@ -221,15 +212,43 @@ def chat_stream_api(req: ChatRequest):
     if not user_msg:
         raise HTTPException(status_code=400, detail="message cannot be empty")
 
-    chats = load_chats()
-    chat_obj = get_chat_or_404(chats, req.session_id, req.chat_id)
+    db: Session = SessionLocal()
 
-    messages = chat_obj.get("messages", [])
-    chat_history = build_chat_history(messages)
+    chat_obj = (
+        db.query(Chat)
+        .filter(Chat.session_id == req.session_id, Chat.chat_id == req.chat_id)
+        .first()
+    )
+    if not chat_obj:
+        db.close()
+        raise HTTPException(status_code=404, detail="chat not found")
+
+    # 读出历史消息，给模型用
+    old_messages = (
+        db.query(Message)
+        .filter(Message.chat_id == req.chat_id)
+        .order_by(Message.created_at.asc())
+        .all()
+    )
+
+    chat_history = [
+        {"role": m.role, "text": m.content}
+        for m in old_messages
+    ]
 
     def event_generator():
         full_reply = ""
         try:
+            # 先把用户消息存进去
+            db.add(Message(
+                chat_id=req.chat_id,
+                role="user",
+                content=user_msg,
+                created_at=datetime.utcnow()
+            ))
+            db.commit()
+
+            # 流式生成回复
             for chunk in stream_reply(
                 user_msg=user_msg,
                 chat_history=chat_history,
@@ -238,18 +257,26 @@ def chat_stream_api(req: ChatRequest):
                 full_reply += chunk
                 yield chunk
 
-            messages.append({"role": "user", "text": user_msg})
-            messages.append({"role": "assistant", "text": full_reply})
+            # 把助手回复存进去
+            db.add(Message(
+                chat_id=req.chat_id,
+                role="assistant",
+                content=full_reply,
+                created_at=datetime.utcnow()
+            ))
 
-            if not messages[:-2]:
-                chat_obj["title"] = user_msg[:20] or "新对话"
+            # 第一次发消息时，顺手设置标题
+            if len(old_messages) == 0:
+                chat_obj.title = user_msg[:20] or "新对话"
 
-            chat_obj["messages"] = messages
-            chat_obj["updated_at"] = now_iso()
-            save_chats(chats)
+            chat_obj.updated_at = datetime.utcnow()
+            db.commit()
 
         except Exception as e:
+            db.rollback()
             yield f"\n[ERROR] {type(e).__name__}: {e}"
+        finally:
+            db.close()
 
     return StreamingResponse(event_generator(), media_type="text/plain; charset=utf-8")
 
@@ -269,5 +296,18 @@ async def upload_image(request: Request, file: UploadFile = File(...)):
     url = str(request.base_url).rstrip("/")
     return {
         "image_path": str(save_path),
-        "preview_url": f"https://valeria-xxx.ngrok-free.dev/uploads/{filename}"
+        "preview_url": f"{url}/uploads/{filename}"
     }
+
+
+@app.get("/chats")
+def chats(session_id: str, db: Session = Depends(get_db)):
+    data = crud.get_chats_by_session(db, session_id)
+    return [
+        {
+            "chat_id": c.chat_id,
+            "title": c.title,
+            "created_at": c.created_at.isoformat() if c.created_at else None,
+        }
+        for c in data
+    ]
