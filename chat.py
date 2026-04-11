@@ -7,7 +7,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-import httpx
 from dotenv import load_dotenv
 from openai import OpenAI, APITimeoutError, APIConnectionError, APIStatusError
 
@@ -42,6 +41,7 @@ client = OpenAI(
     # http_client=http_client
 )
 
+
 # ----------------------------
 # File helpers
 # ----------------------------
@@ -50,19 +50,11 @@ def read_text(path: Path) -> str:
         return ""
     return path.read_text(encoding="utf-8").strip()
 
-def load_json(path: Path, default):
-    if not path.exists():
-        return default
-    with path.open("r", encoding="utf-8") as f:
-        return json.load(f)
-
-def save_json(path: Path, data):
-    with path.open("w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
 
 def append_jsonl(path: Path, obj):
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(obj, ensure_ascii=False) + "\n")
+
 
 def image_path_to_data_url(image_path: Optional[str] = None):
     if not image_path:
@@ -80,6 +72,7 @@ def image_path_to_data_url(image_path: Optional[str] = None):
         encoded = base64.b64encode(f.read()).decode("utf-8")
 
     return f"data:{mime_type};base64,{encoded}"
+
 
 # ----------------------------
 # Memory
@@ -265,7 +258,7 @@ def finalize_reply_turn(
     extracted = extract_memory_from_turn(client, MODEL_NAME, PROMPTS_DIR, user_msg, assistant_msg)
     update_memory_from_extraction(memory, extracted)
     save_json(MEMORY_PATH, memory)
-    
+
 def generate_reply(user_msg: str, chat_history: list, image_path: Optional[str] = None):
     memory, mode, instructions, input_items = prepare_reply_context(
         user_msg=user_msg,
@@ -318,39 +311,6 @@ def stream_reply(user_msg: str, chat_history: list, image_path: Optional[str] = 
         image_path=image_path
     )
 
-def extract_memory_from_turn(user_msg: str, assistant_msg: str) -> dict:
-    summary_prompt = read_text(PROMPTS_DIR / "summary_prompt.txt")
-
-    input_text = f"""
-User message:
-{user_msg}
-
-Assistant message:
-{assistant_msg}
-""".strip()
-
-    response = client.responses.create(
-        model=MODEL_NAME,
-        instructions=summary_prompt,
-        input=input_text
-    )
-
-    raw = response.output_text.strip()
-
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        return {
-            "should_store": False,
-            "short_term_summary": "",
-            "preferences": [],
-            "topics": [],
-            "relationship_notes": [],
-            "inside_jokes": [],
-            "important_events": [],
-            "emotion_tone": "",
-            "confidence": 0.0
-        }
 
 # ----------------------------
 # Main chat loop
