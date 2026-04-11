@@ -207,89 +207,16 @@ def new_chat(req: NewChatRequest, db: Session = Depends(get_db)):
 
 @app.post("/chat/stream")
 def chat_stream_api(req: ChatRequest):
-    print("🚀 enter chat_stream")
-    user_msg = req.message.strip()
-    if not user_msg:
-        raise HTTPException(status_code=400, detail="message cannot be empty")
 
-    db: Session = SessionLocal()
-
-    chat_obj = (
-        db.query(Chat)
-        .filter(Chat.session_id == req.session_id, Chat.chat_id == req.chat_id)
-        .first()
-    )
-    if not chat_obj:
-        db.close()
-        raise HTTPException(status_code=404, detail="chat not found")
-
-    # 读出历史消息，给模型用
-    old_messages = (
-        db.query(Message)
-        .filter(Message.chat_id == req.chat_id)
-        .order_by(Message.created_at.asc())
-        .all()
+    reply = generate_reply(
+        user_msg=req.message,
+        chat_history=[],
+        image_path=req.image_path
     )
 
-    chat_history = []
-
-    for i in range(0, len(old_messages) - 1, 2):
-        user_message_obj = old_messages[i]
-        assistant_message_obj = old_messages[i + 1]
-
-        if user_message_obj.role == "user" and assistant_message_obj.role == "assistant":
-            chat_history.append({
-                "user": user_message_obj.content,
-                "assistant": assistant_message_obj.content
-            })
-
-    def event_generator():
-        print("🚀 start event_generator")
-        full_reply = ""
-
-        try:
-            yield " "
-
-            # 先把用户消息存进去
-            db.add(Message(
-                chat_id=req.chat_id,
-                role="user",
-                content=req.message,
-                created_at=datetime.utcnow()
-            ))
-            db.commit()
-
-            # 流式生成回复
-            for chunk in stream_reply(
-                    user_msg=req.message,
-                    chat_history=chat_history,
-                    image_path=req.image_path
-            ):
-                full_reply += chunk
-                yield chunk
-
-            # 把助手回复存进去
-            db.add(Message(
-                chat_id=req.chat_id,
-                role="assistant",
-                content=full_reply,
-                created_at=datetime.utcnow()
-            ))
-
-            if len(old_messages) == 0:
-                chat_obj.title = req.message[:20] or "新对话"
-
-            chat_obj.updated_at = datetime.utcnow()
-            db.commit()
-
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            db.rollback()
-            yield f"\n[ERROR] {type(e).__name__}: {e}"
-
-        finally:
-            db.close()
+    return {
+        "reply": reply
+    }
 
 
 @app.post("/upload-image")
