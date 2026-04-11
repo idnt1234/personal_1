@@ -507,18 +507,20 @@
             await createNewChat();
         }
 
+        // 👉 先显示用户消息
         messages.push({ role: "user", text: message });
         renderMessages();
 
         messageInput.value = "";
         setLoading(true);
 
-        const assistantMsgDiv = createMessageElement("assistant", "");
+        // 👉 预留 assistant 气泡
+        const assistantMsgDiv = createMessageElement("assistant", "...");
         chatBox.appendChild(assistantMsgDiv);
         scrollToBottom();
 
         try {
-            const response = await fetch(`${API_BASE}/chat/stream`, {
+            const response = await fetch(`${API_BASE}/chat`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -535,51 +537,21 @@
                 throw new Error(`HTTP ${response.status}`);
             }
 
-            if (!response.body) {
-                throw new Error("浏览器不支持流式响应");
-            }
+            // ✅ 非流式：直接拿完整结果
+            const data = await response.json();
+            const fullReply = data.reply || "";
 
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder("utf-8");
+            // 👉 更新 UI
+            assistantMsgDiv.textContent = fullReply;
 
-            let fullReply = "";
-            let pendingChunk = "";
-            let renderScheduled = false;
-
-            function scheduleRender() {
-                if (renderScheduled) return;
-                renderScheduled = true;
-
-                requestAnimationFrame(() => {
-                    if (pendingChunk) {
-                        fullReply += pendingChunk;
-                        pendingChunk = "";
-                        assistantMsgDiv.textContent = fullReply;
-                        scrollToBottom();
-                    }
-                    renderScheduled = false;
-                });
-            }
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                const chunk = decoder.decode(value, { stream: true });
-                pendingChunk += chunk;
-                scheduleRender();
-            }
-
-            if (pendingChunk) {
-                fullReply += pendingChunk;
-                assistantMsgDiv.textContent = fullReply;
-            }
-
+            // 👉 存到本地 messages
             messages.push({ role: "assistant", text: fullReply });
+    
             scrollToBottom();
 
+            // 👉 只更新左边列表（不要 reload 当前聊天）
             await loadChatList();
-            // await openChat(currentChatId);
+
         } catch (error) {
             console.error("请求失败:", error);
             assistantMsgDiv.textContent = `请求失败：${error.message}`;
@@ -588,6 +560,7 @@
             messageInput.focus();
             scrollToBottom();
         }
+
         console.log("发送时 image_path =", uploadedImagePath);
     }
 
