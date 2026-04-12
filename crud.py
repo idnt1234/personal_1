@@ -39,7 +39,7 @@ def get_chats_by_session(db: Session, session_id: str):
     )
 
 
-def fetch_recent_chat(db: Session, chat_id: str, limit: int = 5):
+def fetch_recent_chat(db: Session, chat_id: str, limit: int = 10):
     """
     从 messages 表中取最近 N 轮对话
     """
