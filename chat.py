@@ -220,7 +220,7 @@ def build_input_items(chat_history: list, user_msg: str, examples: list, image_p
             "content": [{"type": "output_text", "text": ex["assistant"]}]
         })
 
-    for turn in chat_history[-5:]:
+    for turn in chat_history:
         user_text = turn["user"]
 
         if turn.get("image_summary"):
@@ -268,28 +268,7 @@ def prepare_reply_context(user_msg: str, chat_history: list, image_path: Optiona
     return memory, mode, instructions, input_items
 
 
-def finalize_reply_turn(
-    memory: dict,
-    user_msg: str,
-    assistant_msg: str,
-    mode: str,
-    image_path: Optional[str] = None
-):
-    append_jsonl(CHAT_LOG_PATH, {
-        "time": datetime.now().isoformat(),
-        "mode": mode,
-        "user": user_msg,
-        "assistant": assistant_msg,
-        "image_path": image_path
-    })
-
-    save_json(MEMORY_PATH, memory)
-
-
-def generate_reply(user_msg: str, db: Session, chat_id: str, image_path=None):
-    # 从数据库读取历史
-    chat_history = fetch_recent_chat(db, chat_id, limit=5)
-
+def generate_reply(user_msg: str, chat_history: list, image_path: Optional[str] = None):
     memory, mode, instructions, input_items = prepare_reply_context(
         user_msg=user_msg,
         chat_history=chat_history,
@@ -304,9 +283,7 @@ def generate_reply(user_msg: str, db: Session, chat_id: str, image_path=None):
 
     assistant_msg = response.output_text.strip()
 
-    # 写入数据库
-    insert_message_pair(db, chat_id, user_msg, assistant_msg)
-
+    # memory 继续本地保存
     save_json(MEMORY_PATH, memory)
 
     return assistant_msg
@@ -318,7 +295,8 @@ def generate_reply(user_msg: str, db: Session, chat_id: str, image_path=None):
 def main():
     print("Companion is online. 输入 exit 退出。\n")
 
-    chat_id = "test_chat"  # ⚠️ 之后你可以换成动态的
+    import uuid
+    chat_id = str(uuid.uuid4())
 
     while True:
         user_msg = input("You > ").strip()
