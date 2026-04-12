@@ -4,16 +4,14 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
-from fastapi import FastAPI, HTTPException, Query, UploadFile, File, Request
+from fastapi import FastAPI, HTTPException, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from chat import generate_reply, stream_reply
+from chat import generate_reply
 
 from fastapi import Depends
-from sqlalchemy import text
 from sqlalchemy.orm import Session
 from database import get_db, Base, engine
 import models
@@ -40,7 +38,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-CHAT_STORE_PATH = Path(__file__).parent / "data" / "chats.json"
 UPLOAD_DIR = Path(__file__).parent / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -52,24 +49,6 @@ app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 # ----------------------------
 def now_utc_iso() -> str:
     return datetime.utcnow().isoformat()
-
-
-def load_chats() -> dict:
-    if not CHAT_STORE_PATH.exists():
-        return {}
-    with CHAT_STORE_PATH.open("r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def save_chats(chats: dict):
-    CHAT_STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with CHAT_STORE_PATH.open("w", encoding="utf-8") as f:
-        json.dump(chats, f, ensure_ascii=False, indent=2)
-
-
-def ensure_session(chats: dict, session_id: str):
-    if session_id not in chats:
-        chats[session_id] = {}
 
 
 def generate_chat_id_from_db(db: Session, session_id: str) -> str:
@@ -92,7 +71,7 @@ def generate_chat_id_from_db(db: Session, session_id: str) -> str:
 
 def build_from_messages(messages: List[Message]) -> List[Dict[str, str]]:
     """
-    把数据库里的 Message 列表，转成你 generate_reply / stream_reply
+    把数据库里的 Message 列表，转成你 generate_reply / stream_reply (LLM理解的结构）
     需要的 chat_history 格式：
     [
         {"user": "...", "assistant": "..."},
@@ -231,28 +210,16 @@ def chat_api(req: ChatRequest):
             .all()
         )
 
-        chat_history = []
-        i = 0
-        while i < len(old_messages) - 1:
-            u = old_messages[i]
-            a = old_messages[i + 1]
-            if u.role == "user" and a.role == "assistant":
-                chat_history.append({
-                    "user": u.content,
-                    "assistant": a.content
-                })
-                i += 2
-            else:
-                i += 1
+        chat_history = build_from_messages(old_messages)
 
-        # 👉 生成完整回复（一次性）
+        # 生成完整回复
         reply = generate_reply(
             user_msg=user_msg,
             chat_history=chat_history,
             image_path=req.image_path
         )
 
-        # 👉 存 user
+        # 存 user
         db.add(Message(
             chat_id=req.chat_id,
             role="user",
