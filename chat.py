@@ -1,6 +1,5 @@
 import os
 import json
-import time
 import base64
 import mimetypes
 from datetime import datetime
@@ -9,6 +8,11 @@ from typing import Optional
 
 from dotenv import load_dotenv
 from openai import OpenAI, APITimeoutError, APIConnectionError, APIStatusError
+
+from sqlalchemy.orm import Session
+from crud import fetch_recent_chat, insert_message_pair
+
+from database import get_db, Base, engine, SessionLocal
 
 # 读取 .env
 load_dotenv()
@@ -20,25 +24,16 @@ DATA_DIR = BASE_DIR / "data"
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.gptsapi.net/v1")
-# OPENAI_PROXY = os.getenv("OPENAI_PROXY")
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-5.4")
 
 if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY 未设置，请检查 .env 文件。")
 
-# HTTP client（代理 + 超时）
-"""
-http_client = httpx.Client(
-    proxy=OPENAI_PROXY,
-    timeout=httpx.Timeout(60.0, connect=20.0)
-)
-"""
 
 # OpenAI-compatible client
 client = OpenAI(
     api_key=OPENAI_API_KEY,
-    base_url=OPENAI_BASE_URL,
-    # http_client=http_client
+    base_url=OPENAI_BASE_URL
 )
 
 
@@ -85,32 +80,59 @@ from memory import (
     default_memory,
     load_json,
     save_json,
-    build_memory_summary,
-    update_memory_from_extraction,
+    build_memory_summary
 )
 
 from summary import (
-    extract_memory_from_turn,
-    generate_image_summary,
+    generate_image_summary
 )
+
 
 # ----------------------------
 # Style routing
 # ----------------------------
+def detect_mode_llm(user_msg: str) -> str:
+    prompt = f"""
+请判断下面这句话更接近哪种对话场景：
+
+可选类别：
+- emotional_support（情绪低落/需要安慰）
+- rant（吐槽/发泄）
+- analysis（认真提问/分析）
+- casual（普通聊天）
+
+只返回类别名称，不要解释。
+
+用户输入：
+{user_msg}
+"""
+
+    response = client.responses.create(
+        model=MODEL_NAME,
+        input=prompt
+    )
+
+    mode = response.output_text.strip()
+
+    # 防御：防止模型乱输出
+    if mode not in {"emotional_support", "rant", "analysis", "casual"}:
+        return "casual"
+
+    return mode
+
+
 def detect_mode(user_msg: str) -> str:
     msg = user_msg.strip()
 
-    low_keywords = ["难过", "心累", "烦", "崩溃", "想哭", "不想活", "空", "没意义", "好痛苦", "抑郁"]
-    rant_keywords = ["离谱", "无语", "气死", "吐槽", "受不了", "笑死", "逆天"]
-    analysis_keywords = ["为什么", "怎么做", "分析", "原因", "思路", "区别", "原理"]
-
-    if any(k in msg for k in low_keywords):
+    if any(k in msg for k in ["难过", "崩溃"]):
         return "emotional_support"
-    if any(k in msg for k in rant_keywords):
+
+    if any(k in msg for k in ["离谱", "无语"]):
         return "rant"
-    if any(k in msg for k in analysis_keywords):
-        return "analysis"
-    return "casual"
+
+    # 不确定 → 用 LLM
+    return detect_mode_llm(user_msg)
+
 
 def mode_instruction(mode: str) -> str:
     mapping = {
@@ -131,59 +153,64 @@ def mode_instruction(mode: str) -> str:
     }
     return mapping.get(mode, mapping["casual"])
 
+
 # ----------------------------
 # Prompt builder
 # ----------------------------
-def build_instructions(memory_summary: str, mode: str) -> str:
-    persona = read_text(PROMPTS_DIR / "persona.txt")
+def build_persona_block():
+    return read_text(PROMPTS_DIR / "persona.txt")
+
+
+def build_user_block():
     user_profile = read_text(PROMPTS_DIR / "user_profile.txt")
+    return f"【用户档案】\n{user_profile}"
+
+
+def build_memory_block(memory_summary: str):
+    return f"【你自然记得的一些事情】\n{memory_summary}"
+
+
+def build_style_block():
     style_rules = read_text(PROMPTS_DIR / "style_rules.txt")
-    memory_file_summary = read_text(PROMPTS_DIR / "memory_summary.txt")
-    dynamic_mode = mode_instruction(mode)
+    return f"【风格规则】\n{style_rules}"
 
-    internal_reflection = """
-在生成回复之前，请先在心里快速想一想（不要把这段思考写出来）：
 
-- 用户现在的语气和情绪大概是什么？
-- 你们现在更像是在轻松聊天、一起吐槽，还是认真讨论？
-- 有没有什么关于用户的记忆可以自然地影响你的回应？
-- 回答时优先保持自然的聊天感，而不是像在完成任务。
+def build_mode_block(mode: str):
+    return f"【当前场景】\n{mode_instruction(mode)}"
 
-不要提到“根据记忆”“根据档案”等系统化表达。
-如果想起之前的事情，可以像朋友一样自然提起。
-"""
 
-    instructions = f"""
-{persona}
+def build_internal_reflection():
+    return """
+在生成回复之前，请先在心里快速想一想（不要写出来）：
 
-【用户档案】
-{user_profile}
+- 用户现在的语气和情绪？
+- 当前是闲聊、吐槽还是分析？
+- 有没有可以自然提起的记忆？
+- 优先保持自然聊天感
 
-【你对用户的一些长期印象】
-{memory_file_summary}
-
-【风格规则】
-{style_rules}
-
-【当前场景】
-{dynamic_mode}
-
-【你自然记得的一些事情】
-{memory_summary}
-
-{internal_reflection}
+不要提到“根据记忆”等系统表达。
 """.strip()
 
-    print("\n===== CURRENT PROMPT =====\n")
-    print(instructions)
-    print("\n==========================\n")
+
+def build_instructions(memory_summary: str, mode: str) -> str:
+    blocks = [
+        build_persona_block(),
+        build_user_block(),
+        build_style_block(),
+        build_mode_block(mode),
+        build_memory_block(memory_summary),
+        build_internal_reflection()
+    ]
+
+    instructions = "\n\n".join(blocks)
 
     return instructions
+
 
 def build_input_items(chat_history: list, user_msg: str, examples: list, image_path: Optional[str] = None):
     items = []
 
-    for ex in examples[:5]:
+    for ex in examples:
         items.append({
             "role": "user",
             "content": [{"type": "input_text", "text": ex["user"]}]
@@ -193,7 +220,7 @@ def build_input_items(chat_history: list, user_msg: str, examples: list, image_p
             "content": [{"type": "output_text", "text": ex["assistant"]}]
         })
 
-    for turn in chat_history[-8:]:
+    for turn in chat_history[-5:]:
         user_text = turn["user"]
 
         if turn.get("image_summary"):
@@ -228,6 +255,7 @@ def build_input_items(chat_history: list, user_msg: str, examples: list, image_p
 
     return items
 
+
 def prepare_reply_context(user_msg: str, chat_history: list, image_path: Optional[str] = None):
     memory = load_json(MEMORY_PATH, default_memory())
     examples = load_json(EXAMPLES_PATH, [])
@@ -255,11 +283,13 @@ def finalize_reply_turn(
         "image_path": image_path
     })
 
-    extracted = extract_memory_from_turn(client, MODEL_NAME, PROMPTS_DIR, user_msg, assistant_msg)
-    update_memory_from_extraction(memory, extracted)
     save_json(MEMORY_PATH, memory)
 
-def generate_reply(user_msg: str, chat_history: list, image_path: Optional[str] = None):
+
+def generate_reply(user_msg: str, db: Session, chat_id: str, image_path=None):
+    # 从数据库读取历史
+    chat_history = fetch_recent_chat(db, chat_id, limit=5)
+
     memory, mode, instructions, input_items = prepare_reply_context(
         user_msg=user_msg,
         chat_history=chat_history,
@@ -273,79 +303,51 @@ def generate_reply(user_msg: str, chat_history: list, image_path: Optional[str] 
     )
 
     assistant_msg = response.output_text.strip()
-    finalize_reply_turn(
-        memory=memory,
-        user_msg=user_msg,
-        assistant_msg=assistant_msg,
-        mode=mode,
-        image_path=image_path
-    )
+
+    # 写入数据库
+    insert_message_pair(db, chat_id, user_msg, assistant_msg)
+
+    save_json(MEMORY_PATH, memory)
+
     return assistant_msg
-
-
-def stream_reply(user_msg: str, chat_history: list, image_path: Optional[str] = None):
-    memory, mode, instructions, input_items = prepare_reply_context(
-        user_msg=user_msg,
-        chat_history=chat_history,
-        image_path=image_path
-    )
-
-    assistant_msg = ""
-
-    with client.responses.stream(
-        model=MODEL_NAME,
-        instructions=instructions,
-        input=input_items
-    ) as stream:
-        for event in stream:
-            if event.type == "response.output_text.delta":
-                delta = event.delta
-                assistant_msg += delta
-                yield delta
-
-    finalize_reply_turn(
-        memory=memory,
-        user_msg=user_msg,
-        assistant_msg=assistant_msg,
-        mode=mode,
-        image_path=image_path
-    )
 
 
 # ----------------------------
 # Main chat loop
 # ----------------------------
 def main():
-    chat_history = []
-
     print("Companion is online. 输入 exit 退出。\n")
+
+    chat_id = "test_chat"  # ⚠️ 之后你可以换成动态的
 
     while True:
         user_msg = input("You > ").strip()
+
         if user_msg.lower() in {"exit", "quit"}:
-            print("Companion > 下次见。记得把自己也当成需要被温柔对待的生物，不只是生产工具。🌙")
+            print("Companion > 下次见。记得把自己也当成需要被温柔对待的生物，不只是生产工具🌙")
             break
 
+        db = SessionLocal()
+
         try:
-            assistant_msg = generate_reply(user_msg, chat_history)
+            assistant_msg = generate_reply(user_msg, db, chat_id)
             print(f"Companion > {assistant_msg}\n")
 
-            chat_history.append({
-                "user": user_msg,
-                "assistant": assistant_msg
-            })
-
         except APITimeoutError:
-            print("Companion > 这次请求超时了，像是网络在闹别扭。你可以重试一下。\n")
+            print("Companion > 请求超时了\n")
 
         except APIConnectionError as e:
-            print(f"Companion > 连接 API 失败：{e}\n")
+            print(f"Companion > API连接失败：{e}\n")
 
         except APIStatusError as e:
-            print(f"Companion > API 返回错误：status={e.status_code}，response={e.response}\n")
+            print(f"Companion > API错误：{e}\n")
 
         except Exception as e:
-            print(f"Companion > 出现未预期错误：{type(e).__name__}: {e}\n")
+            print(f"Companion > 未知错误：{type(e).__name__}: {e}\n")
+
+        finally:
+            db.close()
+
 
 if __name__ == "__main__":
     main()
