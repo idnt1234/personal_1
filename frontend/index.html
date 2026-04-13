@@ -13,18 +13,16 @@
             margin: 0;
             font-family: Arial, sans-serif;
             background: #f5f7fb;
-            display: flex;
-            justify-content: center;
-            padding: 24px;
+            display: block;
+            padding: 0;
         }
 
         .app {
             width: 100%;
-            max-width: 1100px;
-            height: 90vh;
+            height: 100vh;
             background: white;
-            border-radius: 16px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+            border-radius: 0;
+            box-shadow: none;
             display: flex;
             overflow: hidden;
         }
@@ -76,12 +74,12 @@
         }
 
         .chat-item:hover {
-            background: #eff6ff;
+            background: #f1f5f9;
         }
 
         .chat-item.active {
-            border-color: #60a5fa;
-            background: #dbeafe;
+            border-color: #cbd5e1;
+            background: #e2e8f0;
         }
 
         .chat-item-title {
@@ -124,27 +122,29 @@
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 8px;
             background: #fafbfc;
         }
 
         .message {
-            max-width: 75%;
-            padding: 12px 14px;
+            max-width: 95%;
+            padding: 10px 12px;
             border-radius: 14px;
-            line-height: 1.6;
+            line-height: 1.5;
             white-space: pre-wrap;
             word-break: break-word;
         }
 
         .message.user {
             align-self: flex-end;
-            background: #dbeafe;
+            margin-left: auto
+            background: #e5e7eb;
         }
 
         .message.assistant {
             align-self: flex-start;
-            background: #ececec;
+            margin-left: auto
+            background: #f1f5f9;
         }
 
         .input-area {
@@ -198,10 +198,14 @@
             border: 1px solid #d1d5db;
             border-radius: 12px;
             outline: none;
+
+            resize: none;          /* 不允许手动拖 */
+            overflow-y: auto;      /* 超出滚动 */
+            max-height: 120px;     /* 大约3~4行 */
         }
 
         #messageInput:focus {
-            border-color: #60a5fa;
+            border-color: #94a3b8;
         }
 
         .send-row {
@@ -333,12 +337,11 @@
             <div id="imagePreview" class="preview-wrap"></div>
 
             <div class="send-row">
-                <input
+                <textarea
                     id="messageInput"
-                    type="text"
                     placeholder="输入你想说的话..."
-                    autocomplete="off"
-                />
+                    rows="1"
+                ></textarea>
                 <button id="sendButton">发送</button>
             </div>
         </div>
@@ -372,17 +375,36 @@
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    function createMessageElement(role, text) {
+    function createMessageElement(role, text, image) {
         const msgDiv = document.createElement("div");
         msgDiv.className = `message ${role}`;
-        msgDiv.textContent = text;
+
+        // 如果有图片，先加图片
+        if (image) {
+            const img = document.createElement("img");
+            img.src = API_BASE + image;  // 或直接用你的路径
+            img.style.maxWidth = "160px";
+            img.style.borderRadius = "10px";
+            img.style.display = "block";
+            img.style.marginBottom = text ? "6px" : "0";
+
+            msgDiv.appendChild(img);
+        }
+
+        // 再加文字
+        if (text) {
+            const textNode = document.createElement("div");
+            textNode.textContent = text;
+            msgDiv.appendChild(textNode);
+        }
+
         return msgDiv;
     }
 
     function renderMessages() {
         chatBox.innerHTML = "";
         for (const msg of messages) {
-            chatBox.appendChild(createMessageElement(msg.role, msg.text || ""));
+            chatBox.appendChild(createMessageElement(msg.role, msg.text, msg.image));
         }
         scrollToBottom();
     }
@@ -507,14 +529,21 @@
             await createNewChat();
         }
 
-        // 👉 先显示用户消息
-        messages.push({ role: "user", text: message });
+        // 先显示用户消息
+        messages.push({
+            role: "user",
+            text: message,
+            image: uploadedImagePath
+        });
         renderMessages();
+
+        clearImage();
+        messageInput.focus();
 
         messageInput.value = "";
         setLoading(true);
 
-        // 👉 预留 assistant 气泡
+        // 预留 assistant 气泡
         const assistantMsgDiv = createMessageElement("assistant", "...");
         chatBox.appendChild(assistantMsgDiv);
         scrollToBottom();
@@ -545,8 +574,11 @@
             assistantMsgDiv.textContent = fullReply;
 
             // 👉 存到本地 messages
-            messages.push({ role: "assistant", text: fullReply });
-    
+            messages.push({
+                role: "assistant",
+                text: fullReply
+            });
+
             scrollToBottom();
 
             // 👉 只更新左边列表（不要 reload 当前聊天）
@@ -620,6 +652,11 @@
             event.preventDefault();
             sendMessage();
         }
+    });
+
+    messageInput.addEventListener("input", () => {
+        messageInput.style.height = "auto";
+        messageInput.style.height = messageInput.scrollHeight + "px";
     });
 
     dropZone.addEventListener("click", () => imageInput.click());
