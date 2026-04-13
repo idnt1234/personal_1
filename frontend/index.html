@@ -2,16 +2,17 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
     <title>Digital Companion</title>
     <style>
         * {
             box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
         }
-        
+
         input, textarea, button {
             font-family: inherit;
+            color: inherit;
         }
 
         body {
@@ -60,7 +61,7 @@
             border-radius: 12px;
             background: #1f2937;
             color: white;
-            font-size: 15px;
+            font-size: 16px;
             cursor: pointer;
         }
 
@@ -163,20 +164,24 @@
         }
 
         .input-bar {
+            margin: 12px;
             display: flex;
             align-items: center;
             gap: 10px;
 
             padding: 10px 14px;
-            border-radius: 999px;
+            padding-bottom: 80px;
+            border-radius: 20px;
 
-            border: 1px solid #e5e7eb;
-            background: #f8fafc;
+            border: 1px solid rgba(0,0,0,0.05);
+            background: white;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
         }
 
         .input-bar:focus-within {
             border-color: #cbd5e1;
             background: white;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.12);
         }
 
         /* + 按钮 */
@@ -185,6 +190,7 @@
             background: transparent;
             font-size: 20px;
             cursor: pointer;
+            color: #374151;
         }
 
         /* 输入框 */
@@ -198,7 +204,8 @@
             max-height: 120px;
             overflow-y: auto;
 
-            font-size: 15px;
+            font-size: 16px;
+            line-height: 1.5;
         }
 
         #messageInput:focus {
@@ -233,6 +240,7 @@
             background: none;
             border: none;
             cursor: pointer;
+            color: #374151;
         }
 
         /* 手机模式 */
@@ -242,7 +250,7 @@
                 left: -280px;
                 top: 0;
                 height: 100%;
-                z-index: 1000;
+                z-index: 3000;
                 transition: 0.3s;
                 width: 280px;
             }
@@ -250,6 +258,24 @@
             .sidebar.open {
                 left: 0;
             }
+
+            .overlay {
+                position: fixed;
+                inset: 0;
+                background: rgba(0,0,0,0.2);
+                z-index: 2500;
+            }
+        }
+
+        .overlay {
+            display: none;
+            opacity: 0;
+            transition: 0.2s;
+        }
+
+        .overlay.show {
+            display: block;
+            opacity: 1;
         }
 
         .preview-wrap {
@@ -687,6 +713,7 @@
 
     menuButton.addEventListener("click", () => {
         sidebar.classList.toggle("open");
+        overlay.classList.toggle("show");
     });
 
     document.addEventListener("click", (e) => {
