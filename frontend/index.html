@@ -137,95 +137,71 @@
 
         .message.user {
             align-self: flex-end;
-            margin-left: auto
+            margin-left: auto;
             background: #e5e7eb;
         }
 
         .message.assistant {
             align-self: flex-start;
-            margin-left: auto
+            margin-right: auto;
             background: #f1f5f9;
         }
 
-        .input-area {
+        .input-bar {
             display: flex;
-            flex-direction: column;
+            align-items: center;
             gap: 10px;
-            padding: 16px;
-            border-top: 1px solid #e5e7eb;
+
+            padding: 10px 14px;
+            border-radius: 999px;
+
+            border: 1px solid #e5e7eb;
+            background: #f8fafc;
+        }
+
+        .input-bar:focus-within {
+            border-color: #cbd5e1;
             background: white;
         }
 
-        .upload-zone {
-            border: 1px solid #e5e7eb;
-            border-radius: 10px;
-            text-align: center;
-            padding: 6px 10px;
-            font-size: 13px;
-            color: #475569;
+        /* + 按钮 */
+        #addButton {
+            border: none;
+            background: transparent;
+            font-size: 20px;
             cursor: pointer;
-            user-select: none;
-            transition: 0.15s ease;
-            height: 36px;
-            max-width: 160px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
 
-        .upload-zone.dragover {
-            background: #eff6ff;
-            border-color: #60a5fa;
-        }
-
-        .upload-zone small {
-            display: none;
-            margin-top: 6px;
-            color: #64748b;
-        }
-
-        .upload-zone:hover {
-            background: #f1f5f9;
-        }
-
+        /* 输入框 */
         #messageInput {
-            width: 100%;
-            padding: 12px 14px;
-            font-size: 16px;
-            border: 1px solid #d1d5db;
-            border-radius: 12px;
+            flex: 1;
+            border: none;
             outline: none;
+            background: transparent;
 
-            resize: none;          /* 不允许手动拖 */
-            overflow-y: auto;      /* 超出滚动 */
-            max-height: 120px;     /* 大约3~4行 */
+            resize: none;
+            max-height: 120px;
+            overflow-y: auto;
+
+            font-size: 15px;
         }
 
         #messageInput:focus {
             border-color: #94a3b8;
         }
 
-        .send-row {
-            display: flex;
-            gap: 12px;
-        }
-
+        /* 发送按钮（圆的） */
         #sendButton {
-            padding: 12px 18px;
-            font-size: 16px;
+            width: 36px;
+            height: 36px;
+
             border: none;
-            border-radius: 12px;
+            border-radius: 50%;
+
             background: #1f2937;
             color: white;
-            cursor: pointer;
-            min-width: 90px;
-        }
 
-        #sendButton:hover {
-            background: #111827;
+            cursor: pointer;
         }
 
         #sendButton:disabled,
@@ -327,23 +303,18 @@
         </div>
         <div class="chat-box" id="chatBox"></div>
 
-        <div class="input-area">
-            <div id="dropZone" class="upload-zone">
-                把图片拖到这里，或点击选择
-                <small>支持 jpg / png / webp 等图片</small>
-                <input id="imageInput" type="file" accept="image/*" style="display:none;" />
-            </div>
+        <div class="input-bar">
+            <button id="addButton">+</button>
 
-            <div id="imagePreview" class="preview-wrap"></div>
+            <textarea
+                id="messageInput"
+                placeholder="What's on your mind?"
+                rows="1"
+            ></textarea>
 
-            <div class="send-row">
-                <textarea
-                    id="messageInput"
-                    placeholder="输入你想说的话..."
-                    rows="1"
-                ></textarea>
-                <button id="sendButton">发送</button>
-            </div>
+            <button id="sendButton">➤</button>
+
+            <input id="imageInput" type="file" accept="image/*" hidden />
         </div>
     </div>
 </div>
@@ -359,7 +330,6 @@
     const chatList = document.getElementById("chatList");
     const chatTitle = document.getElementById("chatTitle");
 
-    const dropZone = document.getElementById("dropZone");
     const imageInput = document.getElementById("imageInput");
     const imagePreview = document.getElementById("imagePreview");
 
@@ -425,7 +395,9 @@
 
             const time = document.createElement("div");
             time.className = "chat-item-time";
-            time.textContent = item.updated_at || "";
+            time.textContent = item.updated_at
+                ? item.updated_at.split("T")[0]
+                : "";
 
             div.appendChild(title);
             div.appendChild(time);
@@ -443,8 +415,6 @@
         newChatButton.disabled = isLoading;
         messageInput.disabled = isLoading;
         imageInput.disabled = isLoading;
-        dropZone.style.pointerEvents = isLoading ? "none" : "auto";
-        dropZone.style.opacity = isLoading ? "0.7" : "1";
     }
 
     function clearImage() {
@@ -523,6 +493,8 @@
 
     async function sendMessage() {
         const message = messageInput.value.trim();
+        const imageToSend = uploadedImagePath;
+
         if (!message) return;
 
         if (!currentChatId) {
@@ -533,7 +505,7 @@
         messages.push({
             role: "user",
             text: message,
-            image: uploadedImagePath
+            image: imageToSend
         });
         renderMessages();
 
@@ -558,7 +530,7 @@
                     message: message,
                     session_id: SESSION_ID,
                     chat_id: currentChatId,
-                    image_path: uploadedImagePath
+                    image_path: imageToSend
                 })
             });
 
@@ -629,6 +601,10 @@
         document.getElementById("removeImageButton").addEventListener("click", clearImage);
     }
 
+    addButton.addEventListener("click", () => {
+        imageInput.click();
+    });
+
     sendButton.addEventListener("click", () => {
         console.log("clicked");
         sendMessage();
@@ -659,36 +635,31 @@
         messageInput.style.height = messageInput.scrollHeight + "px";
     });
 
-    dropZone.addEventListener("click", () => imageInput.click());
+    const inputBar = document.querySelector(".input-bar");
+
+    inputBar.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        inputBar.style.background = "#eef2f7";
+    });
+
+    inputBar.addEventListener("dragleave", () => {
+        inputBar.style.background = "#f8fafc";
+    });
+
+    inputBar.addEventListener("drop", async (e) => {
+        e.preventDefault();
+        inputBar.style.background = "#f8fafc";
+
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith("image/")) {
+            await uploadImage(file);
+        }
+    });
 
     imageInput.addEventListener("change", async () => {
         if (imageInput.files[0]) {
             try {
                 await uploadImage(imageInput.files[0]);
-            } catch (error) {
-                console.error(error);
-                alert(error.message);
-            }
-        }
-    });
-
-    dropZone.addEventListener("dragover", (e) => {
-        e.preventDefault();
-        dropZone.classList.add("dragover");
-    });
-
-    dropZone.addEventListener("dragleave", () => {
-        dropZone.classList.remove("dragover");
-    });
-
-    dropZone.addEventListener("drop", async (e) => {
-        e.preventDefault();
-        dropZone.classList.remove("dragover");
-
-        const file = e.dataTransfer.files[0];
-        if (file && file.type.startsWith("image/")) {
-            try {
-                await uploadImage(file);
             } catch (error) {
                 console.error(error);
                 alert(error.message);
