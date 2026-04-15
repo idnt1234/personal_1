@@ -2,19 +2,21 @@ import os
 import json
 import base64
 import mimetypes
+from dotenv import load_dotenv
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from dotenv import load_dotenv
 from openai import OpenAI, APITimeoutError, APIConnectionError, APIStatusError
 
 from sqlalchemy.orm import Session
-from crud import fetch_recent_chat, insert_message_pair
+from crud import fetch_recent_chat, insert_message_pair, get_memory
 
 from database import get_db, Base, engine, SessionLocal
-
 # 读取 .env
+from models import Memory
+
+
 load_dotenv()
 
 # 项目目录
@@ -46,6 +48,11 @@ def read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8").strip()
 
 
+def load_json(path: Path):
+    with path.open("r", encoding="utf-8") as f:
+        return json.load(f)
+
+
 def append_jsonl(path: Path, obj):
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(obj, ensure_ascii=False) + "\n")
@@ -72,20 +79,7 @@ def image_path_to_data_url(image_path: Optional[str] = None):
 # ----------------------------
 # Memory
 # ----------------------------
-MEMORY_PATH = DATA_DIR / "memory.json"
 EXAMPLES_PATH = DATA_DIR / "examples.json"
-CHAT_LOG_PATH = DATA_DIR / "chat_log.jsonl"
-
-from memory import (
-    default_memory,
-    load_json,
-    save_json,
-    build_memory_summary
-)
-
-from summary import (
-    generate_image_summary
-)
 
 
 # ----------------------------
@@ -223,9 +217,6 @@ def build_input_items(chat_history: list, user_msg: str, examples: list, image_p
     for turn in chat_history:
         user_text = turn["user"]
 
-        if turn.get("image_summary"):
-            user_text += f"\n（用户当时还发过一张图片，图片摘要：{turn['image_summary']}）"
-
         items.append({
             "role": "user",
             "content": [{"type": "input_text", "text": user_text}]
@@ -256,22 +247,23 @@ def build_input_items(chat_history: list, user_msg: str, examples: list, image_p
     return items
 
 
-def prepare_reply_context(user_msg: str, chat_history: list, image_path: Optional[str] = None):
-    memory = load_json(MEMORY_PATH, default_memory())
+def prepare_reply_context(user_msg, chat_history, db, image_path=None):
     examples = load_json(EXAMPLES_PATH, [])
 
     mode = detect_mode(user_msg)
-    memory_summary = build_memory_summary(memory)
-    instructions = build_instructions(memory_summary, mode)
+    memory_text = get_memory(db)
+
+    instructions = build_instructions(memory_text, mode)
     input_items = build_input_items(chat_history, user_msg, examples, image_path=image_path)
 
-    return memory, mode, instructions, input_items
+    return mode, instructions, input_items
 
 
-def generate_reply(user_msg: str, chat_history: list, image_path: Optional[str] = None):
-    memory, mode, instructions, input_items = prepare_reply_context(
+def generate_reply(user_msg, chat_history, db, image_path=None):
+    mode, instructions, input_items = prepare_reply_context(
         user_msg=user_msg,
         chat_history=chat_history,
+        db=db,
         image_path=image_path
     )
 
@@ -281,12 +273,7 @@ def generate_reply(user_msg: str, chat_history: list, image_path: Optional[str] 
         input=input_items
     )
 
-    assistant_msg = response.output_text.strip()
-
-    # memory 继续本地保存
-    save_json(MEMORY_PATH, memory)
-
-    return assistant_msg
+    return response.output_text.strip()
 
 
 # ----------------------------
@@ -308,7 +295,8 @@ def main():
         db = SessionLocal()
 
         try:
-            assistant_msg = generate_reply(user_msg, db, chat_id)
+            chat_history = fetch_recent_chat(db, chat_id)
+            assistant_msg = generate_reply(user_msg, chat_history, db)
             print(f"Companion > {assistant_msg}\n")
 
         except APITimeoutError:
