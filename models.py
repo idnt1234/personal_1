@@ -1,3 +1,4 @@
+# models.py
 # 定义Chat/Message表结构
 
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
@@ -34,3 +35,11 @@ class Message(Base):
 
     chat = relationship("Chat", back_populates="messages")
 
+
+class Memory(Base):
+    __tablename__ = "memory"
+
+    id = Column(Integer, primary_key=True)
+    category = Column(String(100), nullable=False)  # core / preference / state
+    content = Column(Text, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
