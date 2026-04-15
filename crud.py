@@ -1,3 +1,4 @@
+# crud.py
 # 放增删改查函数
 
 from sqlalchemy.orm import Session
@@ -92,3 +93,40 @@ def insert_message_pair(db: Session, chat_id: str, user_msg: str, assistant_msg:
     db.add(user)
     db.add(assistant)
     db.commit()
+
+
+def get_memory(db: Session):
+    from models import Memory
+
+    memories = db.query(Memory).all()
+
+    return "\n".join(
+        f"【{m.category}】{m.content}"
+        for m in memories
+    )
+
+
+def init_memory(db: Session, content: str = ""):
+    from models import Memory
+
+    if not db.query(Memory).first():
+        mem = Memory(content=content)
+        db.add(mem)
+        db.commit()
+
+
+def upsert_memory(db: Session, category: str, content: str):
+    from models import Memory
+
+    mem = db.query(Memory).filter(Memory.category == category).first()
+
+    if mem:
+        mem.content = content
+    else:
+        mem = Memory(category=category, content=content)
+        db.add(mem)
+
+    db.commit()
+    db.refresh(mem)
+
+    return mem
