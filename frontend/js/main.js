@@ -1,382 +1,386 @@
-    const SESSION_ID = "digital-companion-main";
-    const API_BASE = "https://personal1-e9lq.onrender.com";
+const SESSION_ID = "digital-companion-main";
+const API_BASE = "https://personal1-e9lq.onrender.com";
 
-    const chatBox = document.getElementById("chatBox");
-    const messageInput = document.getElementById("messageInput");
-    const sendButton = document.getElementById("sendButton");
-    const newChatButton = document.getElementById("newChatButton");
-    const chatList = document.getElementById("chatList");
-    const chatTitle = document.getElementById("chatTitle");
+const chatBox = document.getElementById("chatBox");
+const messageInput = document.getElementById("messageInput");
+const sendButton = document.getElementById("sendButton");
+const newChatButton = document.getElementById("newChatButton");
+const chatList = document.getElementById("chatList");
+const chatTitle = document.getElementById("chatTitle");
 
-    const imageInput = document.getElementById("imageInput");
+const imageInput = document.getElementById("imageInput");
 
-    const menuButton = document.getElementById("menuButton");
-    const sidebar = document.querySelector(".sidebar");
+const menuButton = document.getElementById("menuButton");
+const sidebar = document.querySelector(".sidebar");
 
-    const overlay = document.querySelector(".overlay");
+const overlay = document.querySelector(".overlay");
 
-    let currentChatId = null;
-    let messages = [];
-    let chatListData = [];
-    let uploadedImagePath = null;
+let currentChatId = null;
+let messages = [];
+let chatListData = [];
+let uploadedImagePath = null;
 
-    window.addEventListener("load", () => {
-        messageInput.style.height = "auto";
-        messageInput.style.height = messageInput.scrollHeight + "px";
+window.addEventListener("load", () => {
+    messageInput.style.height = "auto";
+    messageInput.style.height = messageInput.scrollHeight + "px";
+});
+
+function scrollToBottom() {
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+function createMessageElement(role, text, image) {
+    const msgDiv = document.createElement("div");
+    msgDiv.className = `message ${role}`;
+
+    // 如果有图片，先加图片
+    if (image) {
+        const img = document.createElement("img");
+        img.src = API_BASE + image;  // 或直接用你的路径
+        img.style.maxWidth = "160px";
+        img.style.borderRadius = "10px";
+        img.style.display = "block";
+        img.style.marginBottom = text ? "6px" : "0";
+
+        msgDiv.appendChild(img);
+    }
+
+    // 再加文字
+    if (text) {
+        const textNode = document.createElement("div");
+        textNode.innerHTML = marked.parse(text);
+        msgDiv.appendChild(textNode);
+    }
+
+    return msgDiv;
+}
+
+function renderMessages() {
+    chatBox.innerHTML = "";
+    for (const msg of messages) {
+        chatBox.appendChild(createMessageElement(msg.role, msg.text, msg.image));
+    }
+    scrollToBottom();
+}
+
+function renderChatList() {
+    chatList.innerHTML = "";
+
+    for (const item of chatListData) {
+        const div = document.createElement("div");
+        div.className = "chat-item";
+        if (item.chat_id === currentChatId) {
+            div.classList.add("active");
+        }
+
+        const title = document.createElement("div");
+        title.className = "chat-item-title";
+        title.textContent = item.title || "新对话";
+
+        const time = document.createElement("div");
+        time.className = "chat-item-time";
+        time.textContent = item.updated_at
+            ? item.updated_at.split("T")[0]
+            : "";
+
+        div.appendChild(title);
+        div.appendChild(time);
+
+        div.addEventListener("click", () => {
+            openChat(item.chat_id);
+        });
+
+        chatList.appendChild(div);
+    }
+}
+
+function setLoading(isLoading) {
+    sendButton.disabled = isLoading;
+    newChatButton.disabled = isLoading;
+    messageInput.disabled = isLoading;
+    imageInput.disabled = isLoading;
+}
+
+function clearImage() {
+    uploadedImagePath = null;
+    imageInput.value = "";
+}
+
+function resizeTextarea() {
+    messageInput.style.height = "auto";
+    messageInput.style.height = messageInput.scrollHeight + "px";
+}
+
+async function loadChatList() {
+    const response = await fetch(
+        `${API_BASE}/chats?session_id=${encodeURIComponent(SESSION_ID)}`,
+        {
+            headers: {
+                "ngrok-skip-browser-warning": "1"
+            }
+        }
+    );
+    if (!response.ok) {
+        throw new Error(`加载聊天列表失败: HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    chatListData = data.chats || [];
+    renderChatList();
+    return chatListData;
+}
+
+async function openChat(chatId) {
+    const response = await fetch(
+        `${API_BASE}/history?session_id=${encodeURIComponent(SESSION_ID)}&chat_id=${encodeURIComponent(chatId)}`,
+        {
+            headers: {
+                "ngrok-skip-browser-warning": "1"
+            }
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error(`加载聊天记录失败: HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    currentChatId = chatId;
+    messages = data.map(m => ({
+        role: m.role,
+        text: m.content
+    }));
+    chatTitle.textContent = data.title || "💬 Digital Companion";
+
+    renderMessages();
+    renderChatList();
+}
+
+async function createNewChat() {
+    const response = await fetch(`${API_BASE}/new-chat`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "1"
+        },
+        body: JSON.stringify({
+            session_id: SESSION_ID
+        })
     });
 
-    function scrollToBottom() {
-        chatBox.scrollTop = chatBox.scrollHeight;
+    if (!response.ok) {
+        throw new Error(`新建聊天失败: HTTP ${response.status}`);
     }
 
-    function createMessageElement(role, text, image) {
-        const msgDiv = document.createElement("div");
-        msgDiv.className = `message ${role}`;
+    const data = await response.json();
+    await loadChatList();
+    await openChat(data.chat_id);
+}
 
-        // 如果有图片，先加图片
-        if (image) {
-            const img = document.createElement("img");
-            img.src = API_BASE + image;  // 或直接用你的路径
-            img.style.maxWidth = "160px";
-            img.style.borderRadius = "10px";
-            img.style.display = "block";
-            img.style.marginBottom = text ? "6px" : "0";
+async function sendMessage() {
+    const message = messageInput.value.trim();
+    const imageToSend = uploadedImagePath;
 
-            msgDiv.appendChild(img);
-        }
+    if (!message) return;
 
-        // 再加文字
-        if (text) {
-            const textNode = document.createElement("div");
-            textNode.innerHTML = marked.parse(text);
-            msgDiv.appendChild(textNode);
-        }
-
-        return msgDiv;
+    if (!currentChatId) {
+        await createNewChat();
     }
 
-    function renderMessages() {
-        chatBox.innerHTML = "";
-        for (const msg of messages) {
-            chatBox.appendChild(createMessageElement(msg.role, msg.text, msg.image));
-        }
-        scrollToBottom();
-    }
+    // 先显示用户消息
+    messages.push({
+        role: "user",
+        text: message,
+        image: imageToSend
+    });
+    renderMessages();
 
-    function renderChatList() {
-        chatList.innerHTML = "";
+    clearImage();
+    messageInput.value = "";
+    resizeTextarea();
 
-        for (const item of chatListData) {
-            const div = document.createElement("div");
-            div.className = "chat-item";
-            if (item.chat_id === currentChatId) {
-                div.classList.add("active");
-            }
+    messageInput.focus();
 
-            const title = document.createElement("div");
-            title.className = "chat-item-title";
-            title.textContent = item.title || "新对话";
+    messageInput.value = "";
+    setLoading(true);
 
-            const time = document.createElement("div");
-            time.className = "chat-item-time";
-            time.textContent = item.updated_at
-                ? item.updated_at.split("T")[0]
-                : "";
+    // 预留 assistant 气泡
+    const assistantMsgDiv = createMessageElement("assistant", "...");
+    chatBox.appendChild(assistantMsgDiv);
+    scrollToBottom();
 
-            div.appendChild(title);
-            div.appendChild(time);
-
-            div.addEventListener("click", () => {
-                openChat(item.chat_id);
-            });
-
-            chatList.appendChild(div);
-        }
-    }
-
-    function setLoading(isLoading) {
-        sendButton.disabled = isLoading;
-        newChatButton.disabled = isLoading;
-        messageInput.disabled = isLoading;
-        imageInput.disabled = isLoading;
-    }
-
-    function clearImage() {
-        uploadedImagePath = null;
-        imageInput.value = "";
-    }
-
-    function resizeTextarea() {
-        messageInput.style.height = "auto";
-        messageInput.style.height = messageInput.scrollHeight + "px";
-    }
-
-    async function loadChatList() {
-        const response = await fetch(
-            `${API_BASE}/chats?session_id=${encodeURIComponent(SESSION_ID)}`,
-            {
-                headers: {
-                    "ngrok-skip-browser-warning": "1"
-                }
-            }
-        );
-        if (!response.ok) {
-            throw new Error(`加载聊天列表失败: HTTP ${response.status}`);
-        }
-
-        const data = await response.json();
-        chatListData = data.chats || [];
-        renderChatList();
-        return chatListData;
-    }
-
-    async function openChat(chatId) {
-        const response = await fetch(
-            `${API_BASE}/history?session_id=${encodeURIComponent(SESSION_ID)}&chat_id=${encodeURIComponent(chatId)}`,
-            {
-                headers: {
-                    "ngrok-skip-browser-warning": "1"
-                }
-            }
-        );
-
-        if (!response.ok) {
-            throw new Error(`加载聊天记录失败: HTTP ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        currentChatId = chatId;
-        messages = data.map(m => ({
-            role: m.role,
-            text: m.content
-        }));
-        chatTitle.textContent = data.title || "💬 Digital Companion";
-
-        renderMessages();
-        renderChatList();
-    }
-
-    async function createNewChat() {
-        const response = await fetch(`${API_BASE}/new-chat`, {
+    try {
+        const response = await fetch(`${API_BASE}/chat`, {
             method: "POST",
             headers: {
-                "Content-Type": "application/json",
-                "ngrok-skip-browser-warning": "1"
+                "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                session_id: SESSION_ID
+                message: message,
+                session_id: SESSION_ID,
+                chat_id: currentChatId,
+                image_path: imageToSend
             })
         });
 
         if (!response.ok) {
-            throw new Error(`新建聊天失败: HTTP ${response.status}`);
+            throw new Error(`HTTP ${response.status}`);
         }
 
+        // ✅ 非流式：直接拿完整结果
         const data = await response.json();
-        await loadChatList();
-        await openChat(data.chat_id);
-    }
+        const fullReply = data.reply || "";
 
-    async function sendMessage() {
-        const message = messageInput.value.trim();
-        const imageToSend = uploadedImagePath;
+        // 👉 更新 UI
+        assistantMsgDiv.innerHTML = marked.parse(fullReply);
 
-        if (!message) return;
-
-        if (!currentChatId) {
-            await createNewChat();
-        }
-
-        // 先显示用户消息
+        // 👉 存到本地 messages
         messages.push({
-            role: "user",
-            text: message,
-            image: imageToSend
+            role: "assistant",
+            text: fullReply
         });
-        renderMessages();
 
-        clearImage();
-        messageInput.value = "";
-        resizeTextarea();
-
-        messageInput.focus();
-
-        messageInput.value = "";
-        setLoading(true);
-
-        // 预留 assistant 气泡
-        const assistantMsgDiv = createMessageElement("assistant", "...");
-        chatBox.appendChild(assistantMsgDiv);
         scrollToBottom();
 
-        try {
-            const response = await fetch(`${API_BASE}/chat`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    message: message,
-                    session_id: SESSION_ID,
-                    chat_id: currentChatId,
-                    image_path: imageToSend
-                })
-            });
+        // 👉 只更新左边列表（不要 reload 当前聊天）
+        await loadChatList();
 
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-
-            // ✅ 非流式：直接拿完整结果
-            const data = await response.json();
-            const fullReply = data.reply || "";
-
-            // 👉 更新 UI
-            assistantMsgDiv.innerHTML = marked.parse(fullReply);
-
-            // 👉 存到本地 messages
-            messages.push({
-                role: "assistant",
-                text: fullReply
-            });
-
-            scrollToBottom();
-
-            // 👉 只更新左边列表（不要 reload 当前聊天）
-            await loadChatList();
-
-        } catch (error) {
-            console.error("请求失败:", error);
-            assistantMsgDiv.textContent = `请求失败：${error.message}`;
-        } finally {
-            setLoading(false);
-            messageInput.focus();
-            scrollToBottom();
-        }
-
-        console.log("发送时 image_path =", uploadedImagePath);
+    } catch (error) {
+        console.error("请求失败:", error);
+        assistantMsgDiv.textContent = `请求失败：${error.message}`;
+    } finally {
+        setLoading(false);
+        messageInput.focus();
+        scrollToBottom();
     }
 
-    async function uploadImage(file) {
-        const formData = new FormData();
-        formData.append("file", file);
+    console.log("发送时 image_path =", uploadedImagePath);
+}
 
-        const res = await fetch(`${API_BASE}/upload-image`, {
-            method: "POST",
-            headers: {
-                "ngrok-skip-browser-warning": "1"
-            },
-            body: formData
-        });
+async function uploadImage(file) {
+    const formData = new FormData();
+    formData.append("file", file);
 
-        if (!res.ok) {
-            throw new Error(`图片上传失败: HTTP ${res.status}`);
-        }
-
-        const data = await res.json();
-        uploadedImagePath = data.image_path;
-
-        document.getElementById("removeImageButton").addEventListener("click", clearImage);
-    }
-
-    addButton.addEventListener("click", () => {
-        imageInput.click();
+    const res = await fetch(`${API_BASE}/upload-image`, {
+        method: "POST",
+        headers: {
+            "ngrok-skip-browser-warning": "1"
+        },
+        body: formData
     });
 
-    sendButton.addEventListener("click", () => {
-        console.log("clicked");
+    if (!res.ok) {
+        throw new Error(`图片上传失败: HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    uploadedImagePath = data.image_path;
+
+    document.getElementById("removeImageButton").addEventListener("click", clearImage);
+}
+
+addButton.addEventListener("click", () => {
+    imageInput.click();
+});
+
+sendButton.addEventListener("click", () => {
+    console.log("clicked");
+    sendMessage();
+});
+
+newChatButton.addEventListener("click", async () => {
+    try {
+        setLoading(true);
+        await createNewChat();
+        messageInput.focus();
+    } catch (error) {
+        console.error("新建聊天失败:", error);
+        alert(`新建聊天失败：${error.message}`);
+    } finally {
+        setLoading(false);
+    }
+});
+
+messageInput.addEventListener("keydown", function (event) {
+    const isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
+
+    if (event.key === "Enter" && !event.shiftKey && !isMobile) {
+        event.preventDefault();
         sendMessage();
-    });
+    }
+});
 
-    newChatButton.addEventListener("click", async () => {
+messageInput.addEventListener("input", resizeTextarea, () => {
+    messageInput.style.height = "auto";
+    messageInput.style.height = messageInput.scrollHeight + "px";
+});
+
+const inputBar = document.querySelector(".input-bar");
+
+inputBar.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    inputBar.style.background = "#eef2f7";
+});
+
+inputBar.addEventListener("dragleave", () => {
+    inputBar.style.background = "#f8fafc";
+});
+
+inputBar.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    inputBar.style.background = "#f8fafc";
+
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith("image/")) {
+        await uploadImage(file);
+    }
+});
+
+imageInput.addEventListener("change", async () => {
+    if (imageInput.files[0]) {
         try {
-            setLoading(true);
+            await uploadImage(imageInput.files[0]);
+        } catch (error) {
+            console.error(error);
+            alert(error.message);
+        }
+    }
+});
+
+window.addEventListener("load", async () => {
+    try {
+        await loadChatList();
+
+        if (chatListData.length > 0) {
+            await openChat(chatListData[0].chat_id);
+        } else {
             await createNewChat();
-            messageInput.focus();
-        } catch (error) {
-            console.error("新建聊天失败:", error);
-            alert(`新建聊天失败：${error.message}`);
-        } finally {
-            setLoading(false);
         }
-    });
+    } catch (error) {
+        console.error("初始化失败:", error);
+        chatTitle.textContent = "💬 Digital Companion";
+        chatBox.innerHTML = "";
+        chatBox.appendChild(createMessageElement("assistant", `初始化失败：${error.message}`));
+    }
+});
 
-    messageInput.addEventListener("keydown", function (event) {
-        const isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
+menuButton.addEventListener("click", () => {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show");
+});
 
-        if (event.key === "Enter" && !event.shiftKey && !isMobile) {
-            event.preventDefault();
-            sendMessage();
-        }
-    });
-
-    messageInput.addEventListener("input", resizeTextarea, () => {
-        messageInput.style.height = "auto";
-        messageInput.style.height = messageInput.scrollHeight + "px";
-    });
-
-    const inputBar = document.querySelector(".input-bar");
-
-    inputBar.addEventListener("dragover", (e) => {
-        e.preventDefault();
-        inputBar.style.background = "#eef2f7";
-    });
-
-    inputBar.addEventListener("dragleave", () => {
-        inputBar.style.background = "#f8fafc";
-    });
-
-    inputBar.addEventListener("drop", async (e) => {
-        e.preventDefault();
-        inputBar.style.background = "#f8fafc";
-
-        const file = e.dataTransfer.files[0];
-        if (file && file.type.startsWith("image/")) {
-            await uploadImage(file);
-        }
-    });
-
-    imageInput.addEventListener("change", async () => {
-        if (imageInput.files[0]) {
-            try {
-                await uploadImage(imageInput.files[0]);
-            } catch (error) {
-                console.error(error);
-                alert(error.message);
-            }
-        }
-    });
-
-    window.addEventListener("load", async () => {
-        try {
-            await loadChatList();
-
-            if (chatListData.length > 0) {
-                await openChat(chatListData[0].chat_id);
-            } else {
-                await createNewChat();
-            }
-        } catch (error) {
-            console.error("初始化失败:", error);
-            chatTitle.textContent = "💬 Digital Companion";
-            chatBox.innerHTML = "";
-            chatBox.appendChild(createMessageElement("assistant", `初始化失败：${error.message}`));
-        }
-    });
-
-    menuButton.addEventListener("click", () => {
-        sidebar.classList.toggle("open");
-        overlay.classList.toggle("show");
-    });
-
-    document.addEventListener("click", (e) => {
-        if (!sidebar.contains(e.target) && !menuButton.contains(e.target)) {
-            sidebar.classList.remove("open");
-        }
-    });
-
-    overlay.addEventListener("click", () => {
+document.addEventListener("click", (e) => {
+    if (!sidebar.contains(e.target) && !menuButton.contains(e.target)) {
         sidebar.classList.remove("open");
-        overlay.classList.remove("show");
-    });
+    }
+});
+
+document.getElementById("memoryButton").onclick = () => {
+    window.location.href = "/memory.html";
+};
+
+overlay.addEventListener("click", () => {
+    sidebar.classList.remove("open");
+    overlay.classList.remove("show");
+});
