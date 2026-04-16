@@ -1,5 +1,6 @@
 import json
 import uuid
+import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -216,6 +217,7 @@ def chat_api(req: ChatRequest):
         reply = generate_reply(
             user_msg=user_msg,
             chat_history=chat_history,
+            db=db,
             image_path=req.image_path
         )
 
@@ -249,6 +251,10 @@ def chat_api(req: ChatRequest):
 
     except Exception as e:
         db.rollback()
+
+        print("🔥 ERROR:", e)
+        traceback.print_exc()
+
         raise HTTPException(status_code=500, detail=str(e))
 
     finally:
