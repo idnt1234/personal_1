@@ -1,0 +1,340 @@
+* {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+input, textarea, button {
+    font-family: inherit;
+    color: inherit;
+}
+
+body {
+    margin: 0;
+    background: #f5f7fb;
+    display: block;
+    padding: 0;
+
+    font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+}
+
+.app {
+    width: 100%;
+    height: 100dvh;
+    background: white;
+    border-radius: 0;
+    box-shadow: none;
+    display: flex;
+    overflow: hidden;
+}
+
+.sidebar {
+    width: 280px;
+    border-right: 1px solid #e5e7eb;
+    background: #f8fafc;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-header {
+    padding: 16px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+#newChatButton {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 12px;
+    background: #1f2937;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+#newChatButton:hover {
+    background: #111827;
+}
+
+.chat-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.chat-item {
+    padding: 12px;
+    background: white;
+    border-radius: 12px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    line-height: 1.4;
+}
+
+.chat-item:hover {
+    background: #f1f5f9;
+}
+
+.chat-item.active {
+    border-color: #cbd5e1;
+    background: #e2e8f0;
+}
+
+.chat-item-title {
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chat-item-time {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+}
+
+.header {
+    position: relative;
+    z-index: 2000;
+    padding: 18px 20px;
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 22px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    overflow: hidden;
+}
+
+.chat-box {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: #fafbfc;
+    min-height: 0;
+}
+
+.message {
+    max-width: 95%;
+    padding: 10px 12px;
+    border-radius: 14px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.message.user {
+    align-self: flex-end;
+    margin-left: auto;
+    background: #e5e7eb;
+}
+
+.message.assistant {
+    align-self: flex-start;
+    margin-right: auto;
+    background: #f1f5f9;
+}
+
+.message p + p {
+    margin-top: 6px;
+}
+
+.input-bar {
+    margin: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    padding: 10px 14px;
+    padding-bottom: 10px;
+    border-radius: 20px;
+
+    border: 1px solid rgba(0,0,0,0.05);
+    background: white;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+
+.input-bar:focus-within {
+    border-color: #cbd5e1;
+    background: white;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+}
+
+/* + 按钮 */
+#addButton {
+    border: none;
+    background: transparent;
+    font-size: 20px;
+    cursor: pointer;
+    color: #374151;
+}
+
+/* 输入框 */
+#messageInput {
+    flex-grow: 1;
+    height: auto;
+    border: none;
+    outline: none;
+    background: transparent;
+
+    resize: none;
+    max-height: 120px;
+    overflow-y: auto;
+
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+#messageInput:focus {
+    border-color: #94a3b8;
+}
+
+/* 发送按钮（圆的） */
+#sendButton {
+    width: 36px;
+    height: 36px;
+
+    border: none;
+    border-radius: 50%;
+
+    background: #1f2937;
+    color: white;
+
+    cursor: pointer;
+}
+
+#sendButton:disabled,
+#newChatButton:disabled {
+    background: #93c5fd;
+    cursor: not-allowed;
+}
+
+#menuButton {
+    position: relative;
+    z-index: 2001;
+    margin-right: 10px;
+    font-size: 20px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #374151;
+}
+
+/* 手机模式 */
+@media (max-width: 768px) {
+    .sidebar {
+        position: fixed;
+        left: -280px;
+        top: 0;
+        height: 100%;
+        z-index: 3000;
+        transition: 0.3s;
+        width: 280px;
+    }
+
+    .sidebar.open {
+        left: 0;
+    }
+
+    .overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.2);
+        z-index: 2500;
+    }
+}
+
+.overlay {
+    display: none;
+    opacity: 0;
+    transition: 0.2s;
+}
+
+.overlay.show {
+    display: block;
+    opacity: 1;
+}
+
+.preview-wrap {
+    display: none;
+    padding: 0 2px;
+}
+
+.preview-card {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #f8fafc;
+}
+
+.preview-card img {
+    width: 88px;
+    height: 88px;
+    object-fit: cover;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+}
+
+.preview-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    text-align: left;
+}
+
+.preview-meta .name {
+    font-size: 14px;
+    color: #0f172a;
+    word-break: break-word;
+}
+
+.preview-meta button {
+    width: fit-content;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 10px;
+    cursor: pointer;
+    background: #e2e8f0;
+}
+
+.preview-meta button:hover {
+    background: #cbd5e1;
+}
+
+.message code {
+    background: #e5e7eb;
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.message pre {
+    background: #f1f5f9;
+    padding: 10px;
+    border-radius: 8px;
+    overflow-x: auto;
+}
