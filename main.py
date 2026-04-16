@@ -33,11 +33,7 @@ app = FastAPI(title="Digital Companion API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5500",
-        "http://127.0.0.1:5500",
-        "https://personal2-iota.vercel.app",
-    ],
+    allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -135,6 +131,16 @@ class NewChatRequest(BaseModel):
 class MemoryUpdateRequest(BaseModel):
     category: str
     content: str
+
+
+class MemoryItem(BaseModel):
+    id: Optional[int] = None
+    category: str
+    content: str
+
+
+class MemoryBulkRequest(BaseModel):
+    memories: List[MemoryItem]
 
 
 # ----------------------------
@@ -343,9 +349,38 @@ def update_memory_api(req: MemoryUpdateRequest):
         import traceback
         db.rollback()
 
-        print("🔥 MEMORY ERROR:", e)
+        print("MEMORY ERROR:", e)
         traceback.print_exc()
 
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+@app.post("/memory/bulk_update")
+def bulk_update_memory(req: MemoryBulkRequest):
+    db = SessionLocal()
+    try:
+        from models import Memory
+
+        # 先清空（简单粗暴但稳定）
+        db.query(Memory).delete()
+
+        for item in req.memories:
+            mem = Memory(
+                category=item.category,
+                content=item.content
+            )
+            db.add(mem)
+
+        db.commit()
+        return {"status": "ok"}
+
+    except Exception as e:
+        import traceback
+        db.rollback()
+        print("BULK ERROR:", e)
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
     finally:
         db.close()
