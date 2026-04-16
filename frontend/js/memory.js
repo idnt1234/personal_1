@@ -1,19 +1,20 @@
-async function saveMemory() {
-  const category = document.getElementById("category").value;
-  const content = document.getElementById("content").value;
-
-  const res = await fetch("/memory/update", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      category,
-      content
-    })
-  });
-
+async function loadMemory() {
+  const res = await fetch("/memory");
   const data = await res.json();
 
-  document.getElementById("status").innerText = "✅ saved";
+  const tbody = document.querySelector("#memoryTable tbody");
+  tbody.innerHTML = "";
+
+  data.memories.forEach(mem => {
+    const row = document.createElement("tr");
+
+    row.innerHTML = `
+      <td>${mem.category}</td>
+      <td>${mem.content}</td>
+    `;
+
+    tbody.appendChild(row);
+  });
 }
+
+loadMemory();
