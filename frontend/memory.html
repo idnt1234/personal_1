@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>Memory Panel</title>
+</head>
+<body>
+
+<h2>🧠 Memory Panel</h2>
+
+<div>
+  <label>Category:</label><br>
+  <input id="category" placeholder="core / preference / state" style="width:300px;">
+</div>
+
+<br>
+
+<div>
+  <label>Content:</label><br>
+  <textarea id="content" rows="6" style="width:500px;"></textarea>
+</div>
+
+<br>
+
+<button onclick="saveMemory()">save</button>
+
+<p id="status"></p>
+
+<script src="/js/memory.js"></script>
+
+</body>
+</html>
