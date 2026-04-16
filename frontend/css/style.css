@@ -47,7 +47,7 @@ body {
     border-bottom: 1px solid #e5e7eb;
 }
 
-#newChatButton {
+.sidebar-button {
     width: 100%;
     padding: 12px;
     border: none;
@@ -58,7 +58,7 @@ body {
     cursor: pointer;
 }
 
-#newChatButton:hover {
+.sidebar-button:hover {
     background: #111827;
 }
 
