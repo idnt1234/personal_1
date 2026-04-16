@@ -2,6 +2,7 @@ import os
 import json
 import base64
 import mimetypes
+import traceback
 from dotenv import load_dotenv
 from datetime import datetime
 from pathlib import Path
@@ -48,9 +49,16 @@ def read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8").strip()
 
 
-def load_json(path: Path):
-    with path.open("r", encoding="utf-8") as f:
-        return json.load(f)
+def load_json(path: Path, default=None):
+    if not path.exists():
+        return default
+
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print("⚠JSON load error:", e)
+        return default
 
 
 def append_jsonl(path: Path, obj):
