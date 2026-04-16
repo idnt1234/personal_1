@@ -2,24 +2,28 @@ import json
 import uuid
 import traceback
 from datetime import datetime
+from dotenv import load_dotenv
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Request
+from fastapi import FastAPI, HTTPException, UploadFile, File, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from chat import generate_reply
 
-from fastapi import Depends
 from sqlalchemy.orm import Session
-from database import get_db, Base, engine
+from database import get_db, Base, engine, SessionLocal
 import models
-import crud
 
-from database import SessionLocal
 from models import Chat, Message
+import crud
+from crud import (
+    fetch_recent_chat,
+    get_memory,
+    upsert_memory
+)
 
 
 Base.metadata.create_all(bind=engine)
@@ -39,9 +43,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+BASE_DIR = Path(__file__).parent
+load_dotenv(BASE_DIR / ".env")
 UPLOAD_DIR = Path(__file__).parent / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+app.mount("/css", StaticFiles(directory="css"), name="css")
+app.mount("/js", StaticFiles(directory="js"), name="js")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 
@@ -122,6 +130,11 @@ class ChatRequest(BaseModel):
 class NewChatRequest(BaseModel):
     session_id: str
     title: Optional[str] = None
+
+
+class MemoryUpdateRequest(BaseModel):
+    category: str
+    content: str
 
 
 # ----------------------------
@@ -295,3 +308,44 @@ def chats(session_id: str, db: Session = Depends(get_db)):
             for c in data
         ]
     }
+
+
+@app.get("/memory")
+def get_memory_api():
+    db = SessionLocal()
+    try:
+        from models import Memory
+
+        memories = db.query(Memory).all()
+
+        return {
+            "memories": [
+                {
+                    "id": m.id,
+                    "category": m.category,
+                    "content": m.content
+                }
+                for m in memories
+            ]
+        }
+    finally:
+        db.close()
+
+
+@app.post("/memory/update")
+def update_memory_api(req: MemoryUpdateRequest):
+    db: Session = SessionLocal()
+
+    try:
+        upsert_memory(db, req.category, req.content)
+        return {"status": "ok"}
+    except Exception as e:
+        import traceback
+        db.rollback()
+
+        print("🔥 MEMORY ERROR:", e)
+        traceback.print_exc()
+
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
