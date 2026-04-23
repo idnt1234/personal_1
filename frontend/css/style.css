@@ -58,6 +58,10 @@ body {
     cursor: pointer;
 }
 
+.sidebar-button + .sidebar-button {
+    margin-top: 10px;
+}
+
 .sidebar-button:hover {
     background: #111827;
 }
@@ -131,7 +135,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 12px;
-    background: #fafbfc;
+    background: transparent;
     min-height: 0;
 }
 
