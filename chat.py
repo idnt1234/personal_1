@@ -192,6 +192,9 @@ def prepare_reply_context(user_msg, chat_history, db, image_path=None):
 
 
 def generate_reply(user_msg, chat_history, db, image_path=None):
+    
+    chat_history = chat_history[-5:]
+    
     instructions, input_items = prepare_reply_context(
         user_msg=user_msg,
         chat_history=chat_history,
