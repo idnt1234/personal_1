@@ -2,20 +2,16 @@ import os
 import json
 import base64
 import mimetypes
-import traceback
 from dotenv import load_dotenv
-from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 from openai import OpenAI, APITimeoutError, APIConnectionError, APIStatusError
 
 from sqlalchemy.orm import Session
-from crud import fetch_recent_chat, insert_message_pair, get_memory
+from crud import fetch_recent_chat, get_memory
 
-from database import get_db, Base, engine, SessionLocal
-# 读取 .env
-from models import Memory
+from database import SessionLocal
 
 
 load_dotenv()
@@ -61,11 +57,6 @@ def load_json(path: Path, default=None):
         return default
 
 
-def append_jsonl(path: Path, obj):
-    with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(obj, ensure_ascii=False) + "\n")
-
-
 def image_path_to_data_url(image_path: Optional[str] = None):
     if not image_path:
         return None
@@ -88,31 +79,6 @@ def image_path_to_data_url(image_path: Optional[str] = None):
 # Memory
 # ----------------------------
 EXAMPLES_PATH = DATA_DIR / "examples.json"
-
-
-# ----------------------------
-# Style routing
-# ----------------------------
-
-
-def mode_instruction(mode: str) -> str:
-    mapping = {
-        "emotional_support": (
-            "当前场景：用户可能处于低落或疲惫状态。"
-            "先接住情绪，减少建议，减少说教，优先陪伴和理解。"
-        ),
-        "rant": (
-            "当前场景：用户在吐槽或调侃。先共鸣、接梗、陪聊，不要突然变严肃讲大道理。可以更口语化一点，语气更活一点，允许自然使用更明显的语气词和更有情绪感的标点。"
-        ),
-        "analysis": (
-            "当前场景：用户在认真提问或分析。"
-            "可以有逻辑和结构，但保持温度，不要变成冰冷答题机。"
-        ),
-        "casual": (
-            "当前场景：普通闲聊。自然、亲切、轻松一点，保持连续关系感。可以像熟人聊天一样稍微放松，允许自然的语气词、感叹和节奏变化。"
-        ),
-    }
-    return mapping.get(mode, mapping["casual"])
 
 
 # ----------------------------
@@ -153,12 +119,11 @@ def build_internal_reflection():
 """.strip()
 
 
-def build_instructions(memory_summary: str, mode: str) -> str:
+def build_instructions(memory_summary: str) -> str:
     blocks = [
         build_persona_block(),
         build_user_block(),
         build_style_block(),
-        build_mode_block(mode),
         build_memory_block(memory_summary),
         build_internal_reflection()
     ]
@@ -168,7 +133,7 @@ def build_instructions(memory_summary: str, mode: str) -> str:
     return instructions
 
 
-def build_input_items(chat_history: list, user_msg: str, examples: list, image_path: Optional[str] = None):
+def build_input_items(chat_history: list, examples: list, user_msg: str, image_path: Optional[str] = None):
     items = []
 
     for ex in examples:
@@ -220,7 +185,7 @@ def prepare_reply_context(user_msg, chat_history, db, image_path=None):
     memory_text = get_memory(db)
 
     instructions = build_instructions(memory_text)
-    input_items = build_input_items(chat_history, user_msg, examples, image_path=image_path)
+    input_items = build_input_items(chat_history, examples, user_msg, image_path=image_path)
 
     return instructions, input_items
 
