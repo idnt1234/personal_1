@@ -93,47 +93,6 @@ EXAMPLES_PATH = DATA_DIR / "examples.json"
 # ----------------------------
 # Style routing
 # ----------------------------
-def detect_mode_llm(user_msg: str) -> str:
-    prompt = f"""
-请判断下面这句话更接近哪种对话场景：
-
-可选类别：
-- emotional_support（情绪低落/需要安慰）
-- rant（吐槽/发泄）
-- analysis（认真提问/分析）
-- casual（普通聊天）
-
-只返回类别名称，不要解释。
-
-用户输入：
-{user_msg}
-"""
-
-    response = client.responses.create(
-        model=MODEL_NAME,
-        input=prompt
-    )
-
-    mode = response.output_text.strip()
-
-    # 防御：防止模型乱输出
-    if mode not in {"emotional_support", "rant", "analysis", "casual"}:
-        return "casual"
-
-    return mode
-
-
-def detect_mode(user_msg: str) -> str:
-    msg = user_msg.strip()
-
-    if any(k in msg for k in ["难过", "崩溃"]):
-        return "emotional_support"
-
-    if any(k in msg for k in ["离谱", "无语"]):
-        return "rant"
-
-    # 不确定 → 用 LLM
-    return detect_mode_llm(user_msg)
 
 
 def mode_instruction(mode: str) -> str:
@@ -178,17 +137,17 @@ def build_style_block():
 
 
 def build_mode_block(mode: str):
-    return f"【当前场景】\n{mode_instruction(mode)}"
+    return f"当前对话氛围偏向：{mode}。自然调整语气即可，不需要刻意切换表达模式。"
 
 
 def build_internal_reflection():
     return """
 在生成回复之前，请先在心里快速想一想（不要写出来）：
 
-- 用户现在的语气和情绪？
-- 当前是闲聊、吐槽还是分析？
-- 有没有可以自然提起的记忆？
-- 优先保持自然聊天感
+- 只专注用户刚刚说的话本身
+- 不要总结，不要规划对话方向
+- 不要刻意“回应情绪”或“引导对话”
+- 像自然聊天一样接住当前这一句
 
 不要提到“根据记忆”等系统表达。
 """.strip()
@@ -258,17 +217,16 @@ def build_input_items(chat_history: list, user_msg: str, examples: list, image_p
 def prepare_reply_context(user_msg, chat_history, db, image_path=None):
     examples = load_json(EXAMPLES_PATH, [])
 
-    mode = detect_mode(user_msg)
     memory_text = get_memory(db)
 
-    instructions = build_instructions(memory_text, mode)
+    instructions = build_instructions(memory_text)
     input_items = build_input_items(chat_history, user_msg, examples, image_path=image_path)
 
-    return mode, instructions, input_items
+    return instructions, input_items
 
 
 def generate_reply(user_msg, chat_history, db, image_path=None):
-    mode, instructions, input_items = prepare_reply_context(
+    instructions, input_items = prepare_reply_context(
         user_msg=user_msg,
         chat_history=chat_history,
         db=db,
