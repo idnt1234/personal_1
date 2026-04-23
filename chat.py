@@ -214,9 +214,9 @@ def call_model_with_retry(**kwargs):
             return client.responses.create(**kwargs)
 
         except APIStatusError as e:
-            if e.status_code == 504:
+            if e.status_code in [500, 502, 503, 504, 520]:
                 wait = 2 * (i + 1)
-                print(f"504 retry {i+1}, waiting {wait}s...")
+                print(f"Retry {i+1} for {e.status_code}, waiting {wait}s...")
                 time.sleep(wait)
             else:
                 raise
