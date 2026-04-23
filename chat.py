@@ -2,6 +2,7 @@ import os
 import json
 import base64
 import mimetypes
+import time
 from dotenv import load_dotenv
 from pathlib import Path
 from typing import Optional
@@ -198,13 +199,29 @@ def generate_reply(user_msg, chat_history, db, image_path=None):
         image_path=image_path
     )
 
-    response = client.responses.create(
+    response = call_model_with_retry(
         model=MODEL_NAME,
         instructions=instructions,
         input=input_items
     )
 
     return response.output_text.strip()
+
+
+def call_model_with_retry(**kwargs):
+    for i in range(3):
+        try:
+            return client.responses.create(**kwargs)
+
+        except APIStatusError as e:
+            if e.status_code == 504:
+                wait = 2 * (i + 1)
+                print(f"504 retry {i+1}, waiting {wait}s...")
+                time.sleep(wait)
+            else:
+                raise
+
+    raise Exception("Model failed after retries")
 
 
 # ----------------------------
