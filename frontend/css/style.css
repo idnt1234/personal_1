@@ -96,6 +96,8 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    user-select: none;
+    -webkit-user-select: none; /* iOS 必须 */
 }
 
 .chat-item-content {
