@@ -75,7 +75,16 @@ function renderChatList() {
 
         const title = document.createElement("div");
         title.className = "chat-item-title";
-        title.textContent = item.title || "新对话";
+        title.textContent = item.title || "New chat";
+        title.addEventListener("dblclick", async (e) => {
+            e.stopPropagation();
+
+            const newName = prompt("Rename chat", item.title || "");
+
+            if (!newName) return;
+
+            await renameChat(item.chat_id, newName);
+        });
 
         const time = document.createElement("div");
         time.className = "chat-item-time";
@@ -83,14 +92,70 @@ function renderChatList() {
             ? item.updated_at.split("T")[0]
             : "";
 
-        div.appendChild(title);
-        div.appendChild(time);
+        // 拼左侧
+        content.appendChild(title);
+        content.appendChild(time);
+
+        // delete 按钮
+        const delBtn = document.createElement("button");
+        delBtn.className = "chat-delete";
+        delBtn.textContent = "🗑️";
+
+        // ❗关键：阻止冒泡
+        delBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            deleteChat(item.chat_id);
+        });
+
+        // 整体点击（打开聊天）
+        div.addEventListener("click", () => {
+            openChat(item.chat_id);
+        });
+
+        div.appendChild(content);
+        div.appendChild(delBtn);
 
         div.addEventListener("click", () => {
             openChat(item.chat_id);
         });
 
         chatList.appendChild(div);
+
+        // 手机上
+        let pressTimer = null;
+
+        div.addEventListener("touchstart", (e) => {
+            const touch = e.touches[0];
+
+            pressTimer = setTimeout(() => {
+                isLongPress = true;
+                showActionMenu(item.chat_id, touch.clientX, touch.clientY);
+            }, 500);
+        });
+
+        div.addEventListener("touchend", () => {
+            clearTimeout(pressTimer);
+        });
+
+        div.addEventListener("touchmove", () => {
+            clearTimeout(pressTimer);
+        });
+
+        let isLongPress = false;
+
+        div.addEventListener("touchstart", () => {
+            isLongPress = false;
+
+            pressTimer = setTimeout(() => {
+                isLongPress = true;
+                showActionMenu(item.chat_id);
+            }, 500);
+        });
+
+        div.addEventListener("click", () => {
+            if (isLongPress) return; // ❗防止误触
+            openChat(item.chat_id);
+        });
     }
 }
 
@@ -109,6 +174,20 @@ function clearImage() {
 function resizeTextarea() {
     messageInput.style.height = "auto";
     messageInput.style.height = messageInput.scrollHeight + "px";
+}
+
+function showActionMenu(chatId) {
+    const actionMenu = document.getElementById("actionMenu");
+
+    let currentActionChatId = null;
+
+    function showActionMenu(chatId, x, y) {
+        currentActionChatId = chatId;
+
+        actionMenu.style.left = x + "px";
+        actionMenu.style.top = y + "px";
+        actionMenu.style.display = "block";
+    }
 }
 
 async function loadChatList() {
@@ -280,6 +359,38 @@ async function uploadImage(file) {
     document.getElementById("removeImageButton").addEventListener("click", clearImage);
 }
 
+async function deleteChat(chatId) {
+    await fetch(`${API_BASE}/delete-chat?session_id=${SESSION_ID}&chat_id=${chatId}`, {
+        method: "DELETE"
+    });
+
+    await loadChatList();
+
+    if (chatId === currentChatId) {
+        if (chatListData.length > 0) {
+            await openChat(chatListData[0].chat_id);
+        } else {
+            await createNewChat();
+        }
+    }
+}
+
+async function renameChat(chatId, newTitle) {
+    const res = await fetch(
+        `${API_BASE}/rename-chat?session_id=${SESSION_ID}&chat_id=${chatId}&title=${encodeURIComponent(newTitle)}`,
+        {
+            method: "POST"
+        }
+    );
+
+    if (!res.ok) {
+        alert("重命名失败");
+        return;
+    }
+
+    await loadChatList();
+}
+
 addButton.addEventListener("click", () => {
     imageInput.click();
 });
@@ -383,4 +494,27 @@ document.getElementById("memoryButton").onclick = () => {
 overlay.addEventListener("click", () => {
     sidebar.classList.remove("open");
     overlay.classList.remove("show");
+});
+
+actionMenu.addEventListener("click", async (e) => {
+    const action = e.target.dataset.action;
+
+    if (!action) return;
+
+    if (action === "rename") {
+        const newName = prompt("新名称：");
+        if (newName) await renameChat(currentActionChatId, newName);
+    }
+
+    if (action === "delete") {
+        if (confirm("确定删除？")) {
+            await deleteChat(currentActionChatId);
+        }
+    }
+
+    actionMenu.style.display = "none";
+});
+
+document.addEventListener("click", () => {
+    actionMenu.style.display = "none";
 });
