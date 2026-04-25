@@ -75,6 +75,9 @@ function renderChatList() {
         if (item.chat_id === currentChatId) {
             div.classList.add("active");
         }
+        
+        const content = document.createElement("div");
+        content.className = "chat-item-content";
 
         const title = document.createElement("div");
         title.className = "chat-item-title";
