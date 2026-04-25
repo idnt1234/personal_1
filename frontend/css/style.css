@@ -75,6 +75,16 @@ body {
     gap: 10px;
 }
 
+.chat-delete {
+    opacity: 0;
+    transition: 0.2s;
+
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: #9ca3af;
+}
+
 .chat-item {
     padding: 12px;
     background: white;
@@ -82,10 +92,24 @@ body {
     cursor: pointer;
     border: 1px solid transparent;
     line-height: 1.4;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.chat-item-content {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .chat-item:hover {
     background: #f1f5f9;
+}
+
+.chat-item:hover .chat-delete {
+    opacity: 1;
 }
 
 .chat-item.active {
@@ -341,4 +365,23 @@ body {
     padding: 10px;
     border-radius: 8px;
     overflow-x: auto;
+}
+
+.action-menu {
+    position: fixed;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    padding: 6px 0;
+    display: none;
+    z-index: 5000;
+}
+
+.action-menu div {
+    padding: 10px 16px;
+    cursor: pointer;
+}
+
+.action-menu div:hover {
+    background: #f1f5f9;
 }
