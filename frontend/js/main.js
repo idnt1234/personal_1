@@ -75,7 +75,7 @@ function renderChatList() {
         if (item.chat_id === currentChatId) {
             div.classList.add("active");
         }
-        
+
         const content = document.createElement("div");
         content.className = "chat-item-content";
 
@@ -129,14 +129,17 @@ function renderChatList() {
 
         // 手机上
         let pressTimer = null;
+        let isLongPress = false;
 
         div.addEventListener("touchstart", (e) => {
+            isLongPress = false;
+
             const touch = e.touches[0];
 
             pressTimer = setTimeout(() => {
                 isLongPress = true;
                 showActionMenu(item.chat_id, touch.clientX, touch.clientY);
-            }, 500);
+            }, 700);
         });
 
         div.addEventListener("touchend", () => {
@@ -146,20 +149,9 @@ function renderChatList() {
         div.addEventListener("touchmove", () => {
             clearTimeout(pressTimer);
         });
-
-        let isLongPress = false;
-
-        div.addEventListener("touchstart", () => {
-            isLongPress = false;
-
-            pressTimer = setTimeout(() => {
-                isLongPress = true;
-                showActionMenu(item.chat_id);
-            }, 500);
-        });
-
+        
         div.addEventListener("click", () => {
-            if (isLongPress) return; // ❗防止误触
+            if (isLongPress) return;
             openChat(item.chat_id);
         });
     }
@@ -502,12 +494,12 @@ actionMenu.addEventListener("click", async (e) => {
     if (!action) return;
 
     if (action === "rename") {
-        const newName = prompt("新名称：");
+        const newName = prompt("New name:");
         if (newName) await renameChat(currentActionChatId, newName);
     }
 
     if (action === "delete") {
-        if (confirm("确定删除？")) {
+        if (confirm("Delete chat?")) {
             await deleteChat(currentActionChatId);
         }
     }
