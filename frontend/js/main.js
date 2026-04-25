@@ -15,6 +15,9 @@ const sidebar = document.querySelector(".sidebar");
 
 const overlay = document.querySelector(".overlay");
 
+const actionMenu = document.getElementById("actionMenu");
+
+let currentActionChatId = null;
 let currentChatId = null;
 let messages = [];
 let chatListData = [];
@@ -176,18 +179,12 @@ function resizeTextarea() {
     messageInput.style.height = messageInput.scrollHeight + "px";
 }
 
-function showActionMenu(chatId) {
-    const actionMenu = document.getElementById("actionMenu");
+function showActionMenu(chatId, x, y) {
+    currentActionChatId = chatId;
 
-    let currentActionChatId = null;
-
-    function showActionMenu(chatId, x, y) {
-        currentActionChatId = chatId;
-
-        actionMenu.style.left = x + "px";
-        actionMenu.style.top = y + "px";
-        actionMenu.style.display = "block";
-    }
+    actionMenu.style.left = x + "px";
+    actionMenu.style.top = y + "px";
+    actionMenu.style.display = "block";
 }
 
 async function loadChatList() {
