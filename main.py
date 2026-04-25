@@ -354,6 +354,7 @@ def update_memory_api(req: MemoryUpdateRequest):
     finally:
         db.close()
 
+
 @app.post("/memory/bulk_update")
 def bulk_update_memory(req: MemoryBulkRequest):
     db = SessionLocal()
@@ -382,3 +383,25 @@ def bulk_update_memory(req: MemoryBulkRequest):
 
     finally:
         db.close()
+
+
+@app.delete("/delete-chat")
+def delete_chat(session_id: str, chat_id: str, db: Session = Depends(get_db)):
+    chat = get_chat_or_404_db(db, session_id, chat_id)
+
+    db.delete(chat)
+    db.commit()
+
+    return {"status": "ok"}
+
+
+@app.post("/rename-chat")
+def rename_chat(session_id: str, chat_id: str, title: str, db: Session = Depends(get_db)):
+    chat = get_chat_or_404_db(db, session_id, chat_id)
+
+    chat.title = title.strip() or "New chat"
+    chat.updated_at = datetime.utcnow()
+
+    db.commit()
+
+    return {"status": "ok"}
