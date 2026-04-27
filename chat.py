@@ -191,7 +191,10 @@ def prepare_reply_context(user_msg, chat_history, db, image_path=None):
     return instructions, input_items
 
 
+# 我哭了
 def generate_reply(user_msg, chat_history, db, image_path=None):
+
+    import json
 
     chat_history = chat_history[-5:]
 
@@ -208,14 +211,45 @@ def generate_reply(user_msg, chat_history, db, image_path=None):
         input=input_items
     )
 
+    # 情况1：返回的是字符串（说明是 SSE 流）
     if isinstance(response, str):
-        if response.startswith("event:"):
-            return "⚠ 模型返回了流式数据（stream未关闭）"
+
+        # 检测是不是流式数据
+        if "event: response." in response:
+
+            lines = response.splitlines()
+            text = ""
+
+            for line in lines:
+                if not line.startswith("data:"):
+                    continue
+
+                try:
+                    data = json.loads(line[5:].strip())
+                except:
+                    continue
+
+                # 优先拿最终完整结果（最稳）
+                if data.get("type") == "response.output_text.done":
+                    final_text = data.get("text", "")
+                    if final_text:
+                        return final_text.strip()
+
+                # 否则拼 delta（逐字）
+                if data.get("type") == "response.output_text.delta":
+                    text += data.get("delta", "")
+
+            if text:
+                return text.strip()
+
+        # 普通字符串 fallback
         return response.strip()
 
-    if hasattr(response, "output_text"):
+    # 情况2：正常对象
+    if hasattr(response, "output_text") and response.output_text:
         return response.output_text.strip()
 
+    # 兜底（防未来炸）
     return str(response).strip()
 
 
