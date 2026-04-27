@@ -211,14 +211,13 @@ def generate_reply(user_msg, chat_history, db, image_path=None):
         input=input_items
     )
 
-    # 🔥 如果是流（最关键）
+    # 🔥 如果是流
     if hasattr(response, "__iter__"):
 
         full_text = ""
 
         try:
             for event in response:
-                # 👉 event 是 dict
                 if not isinstance(event, dict):
                     continue
 
@@ -226,13 +225,18 @@ def generate_reply(user_msg, chat_history, db, image_path=None):
                     full_text += event.get("delta", "")
 
                 if event.get("type") == "response.output_text.done":
-                    return event.get("text", "").strip()
+                    text = event.get("text", "")
+                    if text:
+                        return text.strip()
 
         except Exception as e:
             print("⚠ stream read error:", e)
 
+        # 👉 fallback
         if full_text:
             return full_text.strip()
+
+        return "[empty response]"  # 🔥 关键
 
 
 def call_model_with_retry(**kwargs):
