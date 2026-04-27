@@ -60,9 +60,40 @@ function createMessageElement(role, text, image) {
 
 function renderMessages() {
     chatBox.innerHTML = "";
-    for (const msg of messages) {
-        chatBox.appendChild(createMessageElement(msg.role, msg.text, msg.image));
+    messages.forEach((msg, index) => {
+    const msgDiv = createMessageElement(msg.role, msg.text, msg.image);
+
+    // 👉 如果是 user，加删除按钮
+    if (msg.role === "user") {
+        const wrapper = document.createElement("div");
+        wrapper.style.display = "flex";
+        wrapper.style.flexDirection = "column";
+
+        wrapper.appendChild(msgDiv);
+
+        const actions = document.createElement("div");
+        actions.style.marginTop = "4px";
+        actions.style.display = "flex";
+        actions.style.justifyContent = "flex-end";
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.textContent = "🗑️";
+        deleteBtn.style.border = "none";
+        deleteBtn.style.background = "transparent";
+        deleteBtn.style.cursor = "pointer";
+
+        deleteBtn.onclick = () => {
+            deleteMessagePair(index);
+        };
+
+        actions.appendChild(deleteBtn);
+        wrapper.appendChild(actions);
+
+        chatBox.appendChild(wrapper);
+    } else {
+        chatBox.appendChild(msgDiv);
     }
+});
     scrollToBottom();
 }
 
@@ -113,17 +144,8 @@ function renderChatList() {
             deleteChat(item.chat_id);
         });
 
-        // 整体点击（打开聊天）
-        div.addEventListener("click", () => {
-            openChat(item.chat_id);
-        });
-
         div.appendChild(content);
         div.appendChild(delBtn);
-
-        div.addEventListener("click", () => {
-            openChat(item.chat_id);
-        });
 
         chatList.appendChild(div);
 
@@ -144,16 +166,22 @@ function renderChatList() {
 
         div.addEventListener("touchend", () => {
             clearTimeout(pressTimer);
+
+            if (!isLongPress) {
+                openChat(item.chat_id);
+            }
         });
 
         div.addEventListener("touchmove", () => {
             clearTimeout(pressTimer);
         });
-        
-        div.addEventListener("click", () => {
-            if (isLongPress) return;
-            openChat(item.chat_id);
-        });
+
+        // 👉 只给桌面
+        if (!('ontouchstart' in window)) {
+            div.addEventListener("click", () => {
+                openChat(item.chat_id);
+            });
+        }
     }
 }
 
@@ -180,6 +208,22 @@ function showActionMenu(chatId, x, y) {
     actionMenu.style.left = x + "px";
     actionMenu.style.top = y + "px";
     actionMenu.style.display = "block";
+}
+
+async function deleteMessagePair(index) {
+    const res = await fetch(
+        `${API_BASE}/delete-message-pair?session_id=${SESSION_ID}&chat_id=${currentChatId}&index=${index}`,
+        {
+            method: "DELETE"
+        }
+    );
+
+    if (!res.ok) {
+        alert("删除失败");
+        return;
+    }
+
+    await openChat(currentChatId); // 🔥 重新拉最新数据
 }
 
 async function loadChatList() {
