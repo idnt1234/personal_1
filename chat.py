@@ -220,7 +220,7 @@ def generate_reply(user_msg, chat_history, db, image_path=None):
 
 
 def call_model_with_retry(**kwargs):
-    kwargs["stream"] = False  # 强制关闭
+    kwargs["stream"] = False
 
     for i in range(3):
         try:
