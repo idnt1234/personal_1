@@ -405,3 +405,36 @@ def rename_chat(session_id: str, chat_id: str, title: str, db: Session = Depends
     db.commit()
 
     return {"status": "ok"}
+
+
+@app.delete("/delete-message-pair")
+def delete_message_pair(
+    session_id: str,
+    chat_id: str,
+    index: int,
+    db: Session = Depends(get_db)
+):
+    # 找 chat（防止乱删）
+    chat = get_chat_or_404_db(db, session_id, chat_id)
+
+    # 按时间顺序拿所有 message
+    messages = (
+        db.query(Message)
+        .filter(Message.chat_id == chat_id)
+        .order_by(Message.created_at.asc())
+        .all()
+    )
+
+    # ❗安全检查
+    if index < 0 or index >= len(messages):
+        raise HTTPException(status_code=400, detail="invalid index")
+
+    # 删除 user + assistant（两条）
+    to_delete = messages[index:index+2]
+
+    for m in to_delete:
+        db.delete(m)
+
+    db.commit()
+
+    return {"status": "ok"}
