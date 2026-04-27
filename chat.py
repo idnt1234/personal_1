@@ -193,7 +193,6 @@ def prepare_reply_context(user_msg, chat_history, db, image_path=None):
 
 # 我哭了
 def generate_reply(user_msg, chat_history, db, image_path=None):
-
     import json
 
     chat_history = chat_history[-5:]
@@ -211,32 +210,69 @@ def generate_reply(user_msg, chat_history, db, image_path=None):
         input=input_items
     )
 
-    # 🔥 如果是流
-    if hasattr(response, "__iter__"):
+    # 🟢 情况1：正常返回（最重要！你刚才漏了）
+    if hasattr(response, "output_text") and response.output_text:
+        return response.output_text.strip()
+
+    # 🟡 情况2：SSE流（真正处理）
+    if hasattr(response, "__iter__") and not isinstance(response, (str, bytes)):
 
         full_text = ""
 
-        try:
-            for event in response:
-                if not isinstance(event, dict):
+        for chunk in response:
+
+            if isinstance(chunk, bytes):
+                chunk = chunk.decode("utf-8", errors="ignore")
+
+            if not isinstance(chunk, str):
+                continue
+
+            lines = chunk.splitlines()
+
+            for line in lines:
+                if not line.startswith("data:"):
                     continue
 
-                if event.get("type") == "response.output_text.delta":
-                    full_text += event.get("delta", "")
+                raw = line[5:].strip()
 
-                if event.get("type") == "response.output_text.done":
-                    text = event.get("text", "")
+                if not raw:
+                    continue
+
+                try:
+                    data = json.loads(raw)
+                except:
+                    continue
+
+                if data.get("type") == "response.output_text.done":
+                    text = data.get("text", "")
                     if text:
                         return text.strip()
 
-        except Exception as e:
-            print("⚠ stream read error:", e)
+                if data.get("type") == "response.output_text.delta":
+                    full_text += data.get("delta", "")
 
-        # 👉 fallback
         if full_text:
             return full_text.strip()
 
-        return "[empty response]"  # 🔥 关键
+    # 🔴 情况3：字符串（整坨SSE / fallback）
+    if isinstance(response, str):
+        if "data:" in response:
+            text = ""
+            for line in response.splitlines():
+                if line.startswith("data:"):
+                    try:
+                        data = json.loads(line[5:].strip())
+                        if data.get("type") == "response.output_text.delta":
+                            text += data.get("delta", "")
+                    except:
+                        continue
+            if text:
+                return text.strip()
+
+        return response.strip()
+
+    # 🧨 终极兜底（防数据库炸）
+    return "[empty response]"
 
 
 def call_model_with_retry(**kwargs):
