@@ -208,6 +208,11 @@ def generate_reply(user_msg, chat_history, db, image_path=None):
         input=input_items
     )
 
+    if isinstance(response, str):
+        if response.startswith("event:"):
+            return "⚠ 模型返回了流式数据（stream未关闭）"
+        return response.strip()
+
     if hasattr(response, "output_text"):
         return response.output_text.strip()
 
@@ -215,6 +220,8 @@ def generate_reply(user_msg, chat_history, db, image_path=None):
 
 
 def call_model_with_retry(**kwargs):
+    kwargs["stream"] = False  # 强制关闭
+
     for i in range(3):
         try:
             return client.responses.create(**kwargs)
