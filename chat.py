@@ -192,9 +192,9 @@ def prepare_reply_context(user_msg, chat_history, db, image_path=None):
 
 
 def generate_reply(user_msg, chat_history, db, image_path=None):
-    
+
     chat_history = chat_history[-5:]
-    
+
     instructions, input_items = prepare_reply_context(
         user_msg=user_msg,
         chat_history=chat_history,
@@ -208,7 +208,10 @@ def generate_reply(user_msg, chat_history, db, image_path=None):
         input=input_items
     )
 
-    return response.output_text.strip()
+    if hasattr(response, "output_text"):
+        return response.output_text.strip()
+
+    return str(response).strip()
 
 
 def call_model_with_retry(**kwargs):
