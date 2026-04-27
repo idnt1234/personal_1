@@ -211,46 +211,28 @@ def generate_reply(user_msg, chat_history, db, image_path=None):
         input=input_items
     )
 
-    # 情况1：返回的是字符串（说明是 SSE 流）
-    if isinstance(response, str):
+    # 🔥 如果是流（最关键）
+    if hasattr(response, "__iter__"):
 
-        # 检测是不是流式数据
-        if "event: response." in response:
+        full_text = ""
 
-            lines = response.splitlines()
-            text = ""
-
-            for line in lines:
-                if not line.startswith("data:"):
+        try:
+            for event in response:
+                # 👉 event 是 dict
+                if not isinstance(event, dict):
                     continue
 
-                try:
-                    data = json.loads(line[5:].strip())
-                except:
-                    continue
+                if event.get("type") == "response.output_text.delta":
+                    full_text += event.get("delta", "")
 
-                # 优先拿最终完整结果（最稳）
-                if data.get("type") == "response.output_text.done":
-                    final_text = data.get("text", "")
-                    if final_text:
-                        return final_text.strip()
+                if event.get("type") == "response.output_text.done":
+                    return event.get("text", "").strip()
 
-                # 否则拼 delta（逐字）
-                if data.get("type") == "response.output_text.delta":
-                    text += data.get("delta", "")
+        except Exception as e:
+            print("⚠ stream read error:", e)
 
-            if text:
-                return text.strip()
-
-        # 普通字符串 fallback
-        return response.strip()
-
-    # 情况2：正常对象
-    if hasattr(response, "output_text") and response.output_text:
-        return response.output_text.strip()
-
-    # 兜底（防未来炸）
-    return str(response).strip()
+        if full_text:
+            return full_text.strip()
 
 
 def call_model_with_retry(**kwargs):
