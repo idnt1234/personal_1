@@ -18,13 +18,17 @@
 
     <div class="main">
         <div class="header">
-            <button id="menuButton">☰</button>
-            <span id="chatTitle">💬 Digital Companion</span>
+            <button id="menuButton">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-columns2-icon lucide-columns-2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/></svg>
+            </button>
+            <span id="chatTitle">Digital Companion</span>
         </div>
         <div class="chat-box" id="chatBox"></div>
 
         <div class="input-bar">
-            <button id="addButton">+</button>
+            <button id="addButton">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus-icon lucide-plus"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            </button>
 
             <textarea
                 id="messageInput"
@@ -32,7 +36,9 @@
                 rows="1"
             ></textarea>
 
-            <button id="sendButton">➤</button>
+            <button id="sendButton">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-send-horizontal-icon lucide-send-horizontal"><path d="M3.714 3.048a.498.498 0 0 0-.683.627l2.843 7.627a2 2 0 0 1 0 1.396l-2.842 7.627a.498.498 0 0 0 .682.627l18-8.5a.5.5 0 0 0 0-.904z"/><path d="M6 12h16"/></svg>
+            </button>
 
             <input id="imageInput" type="file" accept="image/*" hidden />
         </div>
