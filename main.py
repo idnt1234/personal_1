@@ -39,6 +39,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 BASE_DIR = Path(__file__).parent
 load_dotenv(BASE_DIR / ".env")
 UPLOAD_DIR = Path(__file__).parent / "uploads"
