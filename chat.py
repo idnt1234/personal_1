@@ -24,7 +24,7 @@ DATA_DIR = BASE_DIR / "data"
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.gptsapi.net/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "gpt-5.4")
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-5.5")
 
 if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY 未设置，请检查 .env 文件。")
