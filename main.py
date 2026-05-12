@@ -9,6 +9,7 @@ from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, HTTPException, UploadFile, File, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from chat import generate_reply
@@ -438,3 +439,8 @@ def delete_message_pair(
     db.commit()
 
     return {"status": "ok"}
+
+
+@app.get("/manifest.json")
+async def manifest():
+    return FileResponse("manifest.json")
