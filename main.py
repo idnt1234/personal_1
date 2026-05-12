@@ -38,7 +38,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-BASE_DIR = Path(__file__).parent
+BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 UPLOAD_DIR = Path(__file__).parent / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -443,4 +443,4 @@ def delete_message_pair(
 
 @app.get("/manifest.json")
 async def manifest():
-    return FileResponse("manifest.json")
+    return FileResponse(BASE_DIR / "manifest.json")
