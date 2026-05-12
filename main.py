@@ -25,9 +25,7 @@ from crud import (
     upsert_memory
 )
 
-
 Base.metadata.create_all(bind=engine)
-
 
 app = FastAPI(title="Digital Companion API")
 
@@ -39,14 +37,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
 BASE_DIR = Path(__file__).parent
 load_dotenv(BASE_DIR / ".env")
 UPLOAD_DIR = Path(__file__).parent / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+
+app.mount("/icons", StaticFiles(directory="icons"), name="icons")
 
 
 # ----------------------------
