@@ -10,6 +10,7 @@ input, textarea, button {
 
 body {
     margin: 0;
+    height: 100dvh;
     background: #f5f7fb;
     display: block;
     padding: 0;
@@ -214,7 +215,7 @@ button svg {
     gap: 10px;
 
     padding: 10px 14px;
-    padding-bottom: 10px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom));
     border-radius: 20px;
 
     border: 1px solid rgba(0,0,0,0.05);
