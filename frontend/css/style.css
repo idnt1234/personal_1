@@ -3,16 +3,53 @@
     -webkit-tap-highlight-color: transparent;
 }
 
+:root {
+    --app-height: 100%;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+}
+
+@supports (height: -webkit-fill-available) {
+    :root {
+        --app-height: -webkit-fill-available;
+    }
+}
+
+@supports (height: 100svh) {
+    :root {
+        --app-height: 100svh;
+    }
+}
+
+@supports (height: 100dvh) {
+    :root {
+        --app-height: 100dvh;
+    }
+}
+
 input, textarea, button {
     font-family: inherit;
     color: inherit;
 }
 
+html {
+    width: 100%;
+    height: 100%;
+    min-height: -webkit-fill-available;
+    overflow: hidden;
+    background: #f5f7fb;
+}
+
 body {
     margin: 0;
-    height: 100dvh;
+    width: 100%;
+    height: var(--app-height);
     background: #f5f7fb;
     display: block;
+    overflow: hidden;
+    overscroll-behavior: none;
     padding: 0;
 
     font-family:
@@ -31,7 +68,8 @@ button svg {
 
 .app {
     width: 100%;
-    height: 100dvh;
+    height: 100%;
+    min-height: 0;
     background: white;
     border-radius: 0;
     box-shadow: none;
@@ -41,6 +79,8 @@ button svg {
 
 .sidebar {
     width: 280px;
+    height: 100%;
+    min-height: 0;
     border-right: 1px solid #e5e7eb;
     background: #f8fafc;
     display: flex;
@@ -48,8 +88,9 @@ button svg {
 }
 
 .sidebar-header {
-    padding: 16px;
+    padding: calc(16px + var(--safe-top)) 16px 16px;
     border-bottom: 1px solid #e5e7eb;
+    flex-shrink: 0;
 }
 
 .sidebar-button {
@@ -73,7 +114,9 @@ button svg {
 
 .chat-list {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     padding: 12px;
     display: flex;
     flex-direction: column;
@@ -141,17 +184,20 @@ button svg {
 }
 
 .main {
-    flex: 1;
+    flex: 1 1 auto;
     display: flex;
     flex-direction: column;
     min-width: 0;
     min-height: 0;
+    height: auto;
+    overflow: hidden;
 }
 
 .header {
     position: relative;
     z-index: 2000;
-    padding: 18px 20px;
+    flex: 0 0 auto;
+    padding: calc(12px + var(--safe-top)) calc(20px + var(--safe-right)) 12px calc(20px + var(--safe-left));
     border-bottom: 1px solid #e5e7eb;
     font-size: 22px;
     font-weight: bold;
@@ -162,9 +208,11 @@ button svg {
 }
 
 .chat-box {
-    flex: 1;
-    padding: 12px 14px;
+    flex: 1 1 auto;
+    padding: 12px calc(14px + var(--safe-right)) 6px calc(14px + var(--safe-left));
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -209,18 +257,21 @@ button svg {
 }
 
 .input-bar {
-    margin: 12px;
+    margin: 8px 12px;
+    margin: 8px calc(12px + var(--safe-right)) max(8px, var(--safe-bottom)) calc(12px + var(--safe-left));
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     gap: 10px;
 
     padding: 10px 14px;
-    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+    min-height: 56px;
     border-radius: 20px;
 
     border: 1px solid rgba(0,0,0,0.05);
     background: white;
     box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+
+    flex: 0 0 auto;
 }
 
 .input-bar:focus-within {
@@ -231,7 +282,15 @@ button svg {
 
 /* + 按钮 */
 #addButton {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
     border: none;
+    border-radius: 50%;
     background: transparent;
     font-size: 20px;
     cursor: pointer;
@@ -244,7 +303,9 @@ button svg {
 
 /* 输入框 */
 #messageInput {
-    flex-grow: 1;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 24px;
     height: auto;
     border: none;
     outline: none;
@@ -252,7 +313,9 @@ button svg {
 
     resize: none;
     max-height: 120px;
+    max-height: min(120px, 30dvh);
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 
     font-size: 16px;
     line-height: 1.5;
@@ -266,6 +329,11 @@ button svg {
 #sendButton {
     width: 36px;
     height: 36px;
+    flex: 0 0 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
 
     border: none;
     border-radius: 50%;
@@ -304,7 +372,8 @@ button svg {
         position: fixed;
         left: -280px;
         top: 0;
-        height: 100%;
+        height: var(--app-height);
+        max-height: var(--app-height);
         z-index: 3000;
         transition: 0.3s;
         width: 280px;
