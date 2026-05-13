@@ -1,6 +1,6 @@
 {
-  "name": "Your App",
-  "short_name": "YourApp",
+  "name": "Astra",
+  "short_name": "Astra",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
